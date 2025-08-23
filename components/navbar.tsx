@@ -283,7 +283,7 @@ export default function Navbar() {
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             aria-label="Toggle theme"
             aria-pressed={theme === "dark"}
-            className="relative group w-11 h-11 rounded-full overflow-hidden select-none"
+            className="relative group w-11 h-11 rounded-full overflow-hidden select-none flowBorder"
             style={{
               border: "1px solid transparent",
               background:
