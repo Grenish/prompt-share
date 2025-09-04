@@ -30,7 +30,6 @@ export default function PromptCardShow({
 
   const handleCopy = async () => {
     try {
-      // Using document.execCommand as a fallback for iframe environments
       const textArea = document.createElement("textarea");
       textArea.value = text;
       document.body.appendChild(textArea);
@@ -62,7 +61,6 @@ export default function PromptCardShow({
 
   return (
     <>
-      {/* Card */}
       <div className="relative w-full flex flex-col items-center">
         {imgSrc && (
           <div
@@ -83,23 +81,23 @@ export default function PromptCardShow({
         )}
 
         <div
-          className="relative w-full max-w-3xl flex flex-col rounded-3xl p-6 pt-16 border border-white/20 bg-white/10 dark:border-gray-700/50 dark:bg-gray-900/50 backdrop-blur-xl shadow-[0_8px_30px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.2)]"
+          className="relative w-full max-w-3xl flex flex-col rounded-3xl p-5 pt-14 md:p-6 md:pt-16 border border-white/20 bg-white/10 dark:border-gray-700/50 dark:bg-gray-900/50 backdrop-blur-xl shadow-[0_6px_22px_rgba(0,0,0,0.07)] dark:shadow-[0_6px_22px_rgba(0,0,0,0.18)]"
         >
           {/* Category chips + ID */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex px-1 gap-2">
-              <span className="py-1 px-3 text-[11px] rounded-full bg-white/20 border border-white/30 text-slate-700 dark:bg-gray-700/20 dark:border-gray-600/30 dark:text-slate-300">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex px-0.5 gap-1.5">
+              <span className="py-0.5 px-2.5 text-[10px] rounded-full bg-white/20 border border-white/30 text-slate-700 dark:bg-gray-700/20 dark:border-gray-600/30 dark:text-slate-300">
                 {category}
               </span>
-              <span className="py-1 px-3 text-[11px] rounded-full bg-white/15 border border-white/25 text-slate-600 dark:bg-gray-700/10 dark:border-gray-600/20 dark:text-slate-400">
+              <span className="py-0.5 px-2.5 text-[10px] rounded-full bg-white/15 border border-white/25 text-slate-600 dark:bg-gray-700/10 dark:border-gray-600/20 dark:text-slate-400">
                 {subCategory}
               </span>
             </div>
-            <span className="text-[11px] text-slate-500 dark:text-slate-400">#{shortId}</span>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400">#{shortId}</span>
           </div>
 
           {/* Prompt text */}
-          <p className="text-slate-800 dark:text-slate-200 text-base md:text-[17px] leading-relaxed mb-5 line-clamp-4">
+          <p className="text-slate-800 dark:text-slate-200 text-sm md:text-base leading-relaxed mb-4 line-clamp-4">
             {text}
           </p>
 
@@ -108,7 +106,7 @@ export default function PromptCardShow({
             <button
               onClick={handleCopy}
               aria-live="polite"
-              className="inline-flex items-center gap-1.5 py-1.5 px-3 text-xs rounded-full bg-white/30 border border-white/40 text-slate-700 hover:bg-white/40 dark:bg-gray-700/30 dark:border-gray-600/40 dark:text-slate-300 dark:hover:bg-gray-700/40 transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 py-1 px-2.5 text-[11px] rounded-full bg-white/30 border border-white/40 text-slate-700 hover:bg-white/40 dark:bg-gray-700/30 dark:border-gray-600/40 dark:text-slate-300 dark:hover:bg-gray-700/40 transition-colors cursor-pointer"
               title={copied ? "Copied" : "Copy prompt"}
             >
               {copied ? (
@@ -121,13 +119,13 @@ export default function PromptCardShow({
                 </>
               )}
             </button>
-            <span className="text-xs text-slate-500 dark:text-slate-400">
+            <span className="text-[11px] text-slate-500 dark:text-slate-400">
               {createdAt.toLocaleDateString()}
             </span>
           </div>
 
           {/* Footer */}
-          <div className="mt-5 border-t border-white/20 dark:border-gray-700/50 pt-3 flex justify-between text-sm">
+          <div className="mt-4 border-t border-white/20 dark:border-gray-700/50 pt-2.5 flex justify-between text-xs md:text-[13px]">
             <span className="text-slate-700 dark:text-slate-300">
               By <span className="font-semibold">{author}</span>
             </span>
