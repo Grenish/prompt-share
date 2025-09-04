@@ -96,14 +96,15 @@ export default function Navbar() {
 
   // interpolation
   const lerp = (a: number, b: number) => a + (b - a) * progress;
-  const expandedMaxW = 896;
-  const compactW = 380;
+  // Compact sizing adjustments
+  const expandedMaxW = 840; // was 896
+  const compactW = 340; // was 380
   const navWidth = Math.round(lerp(expandedMaxW, compactW));
-  const padX = Math.round(lerp(24, 16));
-  const padY = Math.round(lerp(12, 8));
-  const gap = Math.round(lerp(24, 12));
+  const padX = Math.round(lerp(20, 12)); // was 24 -> 16
+  const padY = Math.round(lerp(10, 6)); // was 12 -> 8
+  const gap = Math.round(lerp(20, 10)); // was 24 -> 12
   const labelOpacity = 1 - progress;
-  const labelMaxW = Math.max(0, Math.round(lerp(100, 0)));
+  const labelMaxW = Math.max(0, Math.round(lerp(80, 0))); // was 100 -> 0
   const showIconsOnly = progress > 0.85 && isDesktop;
 
   const navItems = [
@@ -153,9 +154,9 @@ export default function Navbar() {
             >
               {/* Brand */}
               <Link href="/" className="flex items-center gap-2 select-none">
-                <Rocket className="w-5 h-5 text-gray-900 dark:text-gray-100 shrink-0" />
+                <Rocket className="w-4 h-4 text-gray-900 dark:text-gray-100 shrink-0" />
                 <span
-                  className="text-base font-semibold text-gray-900 dark:text-gray-100 overflow-hidden whitespace-nowrap"
+                  className="text-sm md:text-base font-semibold text-gray-900 dark:text-gray-100 overflow-hidden whitespace-nowrap"
                   style={{
                     opacity: isDesktop ? labelOpacity : 1,
                     maxWidth: isDesktop ? labelMaxW : 200,
@@ -175,7 +176,7 @@ export default function Navbar() {
                           href={href}
                           className="flex items-center text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
                         >
-                          <Icon className="h-5 w-5" />
+                          <Icon className="h-4 w-4" />
                         </Link>
                       </TooltipTrigger>
                       <TooltipContent side="bottom">
@@ -209,17 +210,17 @@ export default function Navbar() {
                 <Link
                   href="#"
                   className="flex items-center text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
-                  style={{ gap: 6 }}
+                  style={{ gap: 4 }}
                 >
                   <LogIn className="h-4 w-4" />
-                  <span className="text-sm">Login</span>
+                  <span className="text-xs md:text-sm">Login</span>
                 </Link>
 
                 <Link
                   href="#"
-                  className="rounded-full bg-gray-900 dark:bg-white text-white dark:text-black text-sm hover:opacity-90 transition px-4 py-2"
+                  className="rounded-full bg-gray-900 dark:bg-white text-white dark:text-black text-xs md:text-sm hover:opacity-90 transition px-3.5 py-1.5 md:px-4 md:py-2"
                 >
-                  {isDesktop && progress >= 0.5 ? "Start" : "Get Started"}
+                  {isDesktop && progress >= 0.55 ? "Start" : "Get Started"}
                 </Link>
               </div>
 
@@ -227,7 +228,7 @@ export default function Navbar() {
               <div className="md:hidden flex items-center gap-2">
                 <Link
                   href="#"
-                  className="rounded-full bg-gray-900 text-white text-sm hover:bg-gray-800 px-3 py-1.5"
+                  className="rounded-full bg-gray-900 text-white text-xs hover:bg-gray-800 px-3 py-1.5"
                 >
                   Start
                 </Link>
