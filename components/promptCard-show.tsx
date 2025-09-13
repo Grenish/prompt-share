@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { Copy, Check, Maximize2, X } from "lucide-react";
+import { Copy, Check, ArrowUpRight, Sparkles } from "lucide-react";
 
 interface PromptCardShowProps {
   id: string;
@@ -30,17 +30,19 @@ export default function PromptCardShow({
 
   const handleCopy = async () => {
     try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
       const textArea = document.createElement("textarea");
       textArea.value = text;
       document.body.appendChild(textArea);
       textArea.select();
       document.execCommand("copy");
       document.body.removeChild(textArea);
-      
+
       setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
-    } catch (err) {
-      console.error("Failed to copy text: ", err);
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 
@@ -57,108 +59,221 @@ export default function PromptCardShow({
     };
   }, [imageOpen]);
 
-  const shortId = id.slice(0, 6).toUpperCase();
+  const shortId = id.slice(0, 8).toUpperCase();
+  const formattedDate = createdAt.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 
   return (
     <>
-      <div className="relative w-full flex flex-col items-center">
-        {imgSrc && (
-          <div
-            onClick={() => setImageOpen(true)}
-            className="relative w-[90%] aspect-[16/9] -mb-12 z-20 cursor-pointer group rounded-2xl overflow-hidden shadow-lg"
-          >
-            <Image
-              src={imgSrc}
-              alt={text}
-              fill
-              className="object-cover transition-transform duration-500 group-hover:scale-[1.05]"
-              sizes="(max-width:768px) 100vw, (max-width:1200px) 50vw, 33vw"
-            />
-            <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity">
-              <Maximize2 className="w-6 h-6 text-white" />
-            </div>
-          </div>
-        )}
-
-        <div
-          className="relative w-full max-w-3xl flex flex-col rounded-3xl p-5 pt-14 md:p-6 md:pt-16 border border-white/20 bg-white/10 dark:border-gray-700/50 dark:bg-gray-900/50 backdrop-blur-xl shadow-[0_6px_22px_rgba(0,0,0,0.07)] dark:shadow-[0_6px_22px_rgba(0,0,0,0.18)]"
-        >
-          {/* Category chips + ID */}
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex px-0.5 gap-1.5">
-              <span className="py-0.5 px-2.5 text-[10px] rounded-full bg-white/20 border border-white/30 text-slate-700 dark:bg-gray-700/20 dark:border-gray-600/30 dark:text-slate-300">
-                {category}
-              </span>
-              <span className="py-0.5 px-2.5 text-[10px] rounded-full bg-white/15 border border-white/25 text-slate-600 dark:bg-gray-700/10 dark:border-gray-600/20 dark:text-slate-400">
-                {subCategory}
-              </span>
-            </div>
-            <span className="text-[10px] text-slate-500 dark:text-slate-400">#{shortId}</span>
-          </div>
-
-          {/* Prompt text */}
-          <p className="text-slate-800 dark:text-slate-200 text-sm md:text-base leading-relaxed mb-4 line-clamp-4">
-            {text}
-          </p>
-
-          {/* Actions row */}
-          <div className="flex items-center justify-between">
-            <button
-              onClick={handleCopy}
-              aria-live="polite"
-              className="inline-flex items-center gap-1.5 py-1 px-2.5 text-[11px] rounded-full bg-white/30 border border-white/40 text-slate-700 hover:bg-white/40 dark:bg-gray-700/30 dark:border-gray-600/40 dark:text-slate-300 dark:hover:bg-gray-700/40 transition-colors cursor-pointer"
-              title={copied ? "Copied" : "Copy prompt"}
+      <div className="group relative w-full max-w-2xl mx-auto">
+        <div className="relative bg-card border border-primary/20 dark:border-0 text-card-foreground rounded-xl overflow-hidden transition-all duration-500">
+          {imgSrc && (
+            <div
+              onClick={() => setImageOpen(true)}
+              className="relative w-full aspect-[16/10] cursor-pointer overflow-hidden bg-muted"
             >
-              {copied ? (
-                <>
-                  <Check className="w-4 h-4 text-emerald-500" /> Copied
-                </>
-              ) : (
-                <>
-                  <Copy className="w-4 h-4" /> Copy
-                </>
-              )}
-            </button>
-            <span className="text-[11px] text-slate-500 dark:text-slate-400">
-              {createdAt.toLocaleDateString()}
-            </span>
-          </div>
+              <Image
+                src={imgSrc}
+                alt={text}
+                fill
+                className="object-cover transition-transform duration-700 group-hover:scale-[1.02]"
+                sizes="(max-width:768px) 100vw, (max-width:1200px) 50vw, 33vw"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-foreground/20 via-transparent to-transparent" />
 
-          {/* Footer */}
-          <div className="mt-4 border-t border-white/20 dark:border-gray-700/50 pt-2.5 flex justify-between text-xs md:text-[13px]">
-            <span className="text-slate-700 dark:text-slate-300">
-              By <span className="font-semibold">{author}</span>
-            </span>
-            <span className="text-slate-500 dark:text-slate-400 font-medium">{modelName}</span>
+              <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">
+                <div className="bg-popover/90 backdrop-blur-md rounded-full p-2">
+                  <ArrowUpRight className="w-4 h-4 text-foreground" />
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="p-6 space-y-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-medium tracking-wider text-muted-foreground">
+                  {category.toUpperCase()}
+                </span>
+                <span className="text-muted-foreground">•</span>
+                <span className="text-[10px] font-medium tracking-wider text-muted-foreground">
+                  {subCategory.toUpperCase()}
+                </span>
+              </div>
+              <span className="text-[10px] font-mono text-muted-foreground">
+                #{shortId}
+              </span>
+            </div>
+
+            {/* Prompt Text */}
+            <p className="text-muted-foreground text-sm leading-[1.7] font-light">
+              {text.length > 150 ? `${text.slice(0, 150)}...` : text}
+            </p>
+
+            <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center">
+                    <span className="text-[10px] font-medium text-muted-foreground">
+                      {author.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {author}
+                  </span>
+                </div>
+                <span className="text-[10px] text-muted-foreground">
+                  {formattedDate}
+                </span>
+              </div>
+
+              <button
+                onClick={handleCopy}
+                className={`group/btn relative overflow-hidden px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-300 ${
+                  copied
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground hover:bg-secondary"
+                }`}
+              >
+                <span className="relative z-10 flex items-center gap-1.5">
+                  {copied ? (
+                    <Check className="w-3 h-3" />
+                  ) : (
+                    <Copy className="w-3 h-3" />
+                  )}
+                  {copied ? "Copied" : "Copy"}
+                </span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Image modal */}
-      {imageOpen && (
+      {/* Fullscreen modal */}
+      {imageOpen && imgSrc && (
         <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-background/60 backdrop-blur-xl"
           onClick={() => setImageOpen(false)}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm cursor-zoom-out"
         >
           <div
-            className="relative w-[94vw] max-w-4xl"
+            className="relative w-[92vw] max-w-7xl h-[88vh] bg-card text-card-foreground rounded-2xl overflow-hidden flex shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <button
-              onClick={() => setImageOpen(false)}
-              className="absolute -top-10 right-0 text-white/90 hover:text-white transition-colors"
-              aria-label="Close"
-            >
-              <X className="h-6 w-6" />
-            </button>
-            <Image
-              src={imgSrc!}
-              alt={text}
-              width={1920}
-              height={1080}
-              className="rounded-xl object-contain w-full h-auto"
-              priority
-            />
+            <div className="relative flex-1 bg-muted flex items-center justify-center">
+              <Image
+                src={imgSrc}
+                alt={text}
+                width={1920}
+                height={1080}
+                className="object-contain w-full h-full"
+                priority
+              />
+            </div>
+
+            <div className="w-[380px] flex flex-col bg-card text-card-foreground border-l border-border">
+              <div className="p-6 border-b border-border flex items-start justify-between">
+                <div>
+                  <h3 className="text-sm font-medium mb-1">{author}</h3>
+                  <p className="text-xs text-muted-foreground">
+                    {formattedDate} • {modelName}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setImageOpen(false)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-muted transition-colors group"
+                >
+                  <svg
+                    className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                <div>
+                  <span className="inline-flex items-center gap-2 text-[10px] font-mono text-muted-foreground">
+                    <Sparkles className="w-3 h-3" /> PROMPT {shortId}
+                  </span>
+                </div>
+
+                <div>
+                  <p className="text-[10px] font-medium tracking-wider text-muted-foreground">
+                    CATEGORIES
+                  </p>
+                  <p className="text-sm">
+                    {category} → {subCategory}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[10px] font-medium tracking-wider text-muted-foreground">
+                    PROMPT CONTENT
+                  </p>
+                  <div className="relative group">
+                    <p className="text-sm leading-relaxed bg-muted rounded-lg p-4 pr-12">
+                      {text}
+                    </p>
+                    <button
+                      onClick={handleCopy}
+                      className={`absolute top-3 right-3 p-1.5 rounded-md transition-all duration-200 ${
+                        copied
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-popover text-muted-foreground hover:text-foreground"
+                      }`}
+                      title={copied ? "Copied!" : "Copy prompt"}
+                    >
+                      {copied ? (
+                        <Check className="w-3.5 h-3.5" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-border">
+                  <p className="text-[10px] font-medium tracking-wider text-muted-foreground mb-2">
+                    AI MODEL
+                  </p>
+                  <p className="text-sm">{modelName}</p>
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-border">
+                <button
+                  onClick={handleCopy}
+                  className={`w-full py-3 rounded-lg text-sm font-medium transition-all duration-300 ${
+                    copied
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground"
+                  }`}
+                >
+                  {copied ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Check className="w-4 h-4" /> Copied to clipboard
+                    </span>
+                  ) : (
+                    <span className="flex items-center justify-center gap-2">
+                      <Copy className="w-4 h-4" /> Copy prompt
+                    </span>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
