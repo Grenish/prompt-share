@@ -8,11 +8,11 @@ import {
   PenTool,
   Users,
   LogIn,
-  Rocket,
   Menu,
   X,
   Sun,
   Moon,
+  Book,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 
@@ -23,6 +23,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
+/** Simple media query hook */
 function useMediaQuery(query: string) {
   const [matches, setMatches] = useState(false);
   useEffect(() => {
@@ -35,54 +36,115 @@ function useMediaQuery(query: string) {
   return matches;
 }
 
+/** Tiny spring for numbers (stiffness/damping, no deps) */
+function useSpringNumber(
+  target: number,
+  {
+    stiffness = 260,
+    damping = 28,
+    mass = 1,
+    precision = 0.0005,
+    maxStep = 0.032, // clamp dt for stability
+  }: {
+    stiffness?: number;
+    damping?: number;
+    mass?: number;
+    precision?: number;
+    maxStep?: number;
+  } = {}
+) {
+  const [value, setValue] = useState(target);
+  const valRef = useRef(value);
+  const velRef = useRef(0);
+  const tgtRef = useRef(target);
+  const rafRef = useRef<number | null>(null);
+  const timeRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    tgtRef.current = target;
+    if (rafRef.current == null) tick();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target]);
+
+  useEffect(() => {
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
+
+  function tick() {
+    rafRef.current = requestAnimationFrame(() => {
+      const now = performance.now();
+      const last = timeRef.current ?? now;
+      const dt = Math.min(maxStep, (now - last) / 1000);
+      timeRef.current = now;
+
+      const x = valRef.current;
+      const v = velRef.current;
+      const to = tgtRef.current;
+
+      // Hooke's law towards "to" with damping
+      const k = stiffness;
+      const c = damping;
+      const m = mass;
+
+      // F = -k(x - to) - c*v
+      const F = -k * (x - to) - c * v;
+      const a = F / m;
+
+      const newV = v + a * dt;
+      let newX = x + newV * dt;
+
+      const done =
+        Math.abs(newV) < precision && Math.abs(to - newX) < precision;
+
+      velRef.current = done ? 0 : newV;
+      valRef.current = done ? to : newX;
+
+      setValue(valRef.current);
+
+      if (!done) tick();
+      else {
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+        timeRef.current = null;
+      }
+    });
+  }
+
+  return value;
+}
+
 export default function Navbar() {
   const isDesktop = useMediaQuery("(min-width: 778px)");
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  // scroll → compact nav
-  const [progress, setProgress] = useState(0);
-  const targetRef = useRef(0);
-  const rafRef = useRef<number | null>(null);
+  // Scroll → target progress (0 → 1)
+  const [scrollTarget, setScrollTarget] = useState(0);
   const maxScroll = 160;
-  const damping = 0.12;
-
   useEffect(() => {
     if (!isDesktop) {
-      setProgress(0);
-      targetRef.current = 0;
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
+      setScrollTarget(0);
       return;
     }
-
     const onScroll = () => {
       const t = Math.min(1, Math.max(0, window.scrollY / maxScroll));
-      targetRef.current = t;
-      if (rafRef.current == null) tick();
+      setScrollTarget(t);
     };
-    function tick() {
-      rafRef.current = requestAnimationFrame(() => {
-        setProgress((p) => {
-          const next = p + (targetRef.current - p) * damping;
-          if (Math.abs(next - targetRef.current) > 0.001) {
-            tick();
-          } else {
-            if (rafRef.current) cancelAnimationFrame(rafRef.current);
-            rafRef.current = null;
-            return targetRef.current;
-          }
-          return next;
-        });
-      });
-    }
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, [isDesktop]);
+
+  // Springy progress for a soft, tiny bounce
+  const progress = useSpringNumber(isDesktop ? scrollTarget : 0, {
+    stiffness: 300,
+    damping: 24,
+  });
 
   useEffect(() => {
     if (mobileOpen) {
@@ -96,15 +158,14 @@ export default function Navbar() {
 
   // interpolation
   const lerp = (a: number, b: number) => a + (b - a) * progress;
-  // Compact sizing adjustments
-  const expandedMaxW = 840; // was 896
-  const compactW = 340; // was 380
+  const expandedMaxW = 840;
+  const compactW = 360;
   const navWidth = Math.round(lerp(expandedMaxW, compactW));
-  const padX = Math.round(lerp(20, 12)); // was 24 -> 16
-  const padY = Math.round(lerp(10, 6)); // was 12 -> 8
-  const gap = Math.round(lerp(20, 10)); // was 24 -> 12
+  const padX = Math.round(lerp(20, 12));
+  const padY = Math.round(lerp(10, 6));
+  const gap = Math.round(lerp(20, 10));
   const labelOpacity = 1 - progress;
-  const labelMaxW = Math.max(0, Math.round(lerp(80, 0))); // was 100 -> 0
+  const labelMaxW = Math.max(0, Math.round(lerp(96, 0)));
   const showIconsOnly = progress > 0.85 && isDesktop;
 
   const navItems = [
@@ -114,237 +175,248 @@ export default function Navbar() {
     { href: "#", label: "Community", icon: Users },
   ];
 
+  const isDark = (mounted ? resolvedTheme : "light") === "dark";
+
+  // Glass background styles as a separate layer (content stays crisp)
+  const glassBg = {
+    backdropFilter: "blur(16px) saturate(140%)",
+    WebkitBackdropFilter: "blur(16px) saturate(140%)",
+    background: isDark
+      ? "linear-gradient(180deg, rgba(15,23,42,0.55), rgba(15,23,42,0.36))"
+      : "linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,255,255,0.38))",
+  } as const;
+
+  // Container frame (border + shadow)
+  const frameStyle = {
+    border: isDark
+      ? "1px solid rgba(255,255,255,0.10)"
+      : "1px solid rgba(0,0,0,0.08)",
+    boxShadow: isDark
+      ? "0 10px 28px rgba(0,0,0,0.35)"
+      : "0 10px 28px rgba(2,6,23,0.12)",
+  } as const;
+
+  // Panel style for mobile dropdown
+  const panelStyle = {
+    backdropFilter: "blur(14px) saturate(140%)",
+    WebkitBackdropFilter: "blur(14px) saturate(140%)",
+    background: isDark
+      ? "linear-gradient(180deg, rgba(15,23,42,0.58), rgba(15,23,42,0.42))"
+      : "linear-gradient(180deg, rgba(255,255,255,0.70), rgba(255,255,255,0.50))",
+    border: isDark
+      ? "1px solid rgba(255,255,255,0.10)"
+      : "1px solid rgba(0,0,0,0.08)",
+    boxShadow: isDark
+      ? "0 8px 28px rgba(0,0,0,0.35)"
+      : "0 8px 28px rgba(2,6,23,0.12)",
+  } as const;
+
   return (
     <TooltipProvider delayDuration={150}>
-      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 md:top-6 flex items-center gap-2">
-        {/* === Navbar pill === */}
-        <nav
-          style={{ width: isDesktop ? navWidth : undefined }}
-          className={`${isDesktop ? "" : "w-[92vw] max-w-[640px]"} relative`}
-        >
-          <div
-            className="relative rounded-full overflow-hidden transition-all duration-500"
-            style={{
-              padding: `${isDesktop ? padY : 10}px ${isDesktop ? padX : 14}px`,
-              backdropFilter: "blur(20px) saturate(200%)",
-              WebkitBackdropFilter: "blur(20px) saturate(200%)",
-              background:
-                "linear-gradient(140deg,rgba(255,255,255,0.25),rgba(255,255,255,0.1))",
-              boxShadow:
-                "0 8px 24px rgba(0,0,0,0.08), inset 0 1px 2px rgba(255,255,255,0.25)",
-            }}
+      <div className="fixed top-4 inset-x-0 z-50 md:top-6">
+        <div className="mx-auto flex w-full max-w-[1180px] items-center justify-center gap-2 px-3 md:px-6">
+          <nav
+            style={{ width: isDesktop ? navWidth : undefined }}
+            className={`${isDesktop ? "" : "w-[92vw] max-w-[640px]"} relative`}
+            role="navigation"
           >
-            {/* Navbar border shimmer */}
-            <div className="absolute inset-0 rounded-full pointer-events-none">
-              <div
-                className="absolute inset-0 rounded-full"
-                style={{
-                  padding: "1px",
-                  background:
-                    "linear-gradient(120deg,rgba(255,255,255,0.6),rgba(255,255,255,0.05),rgba(255,255,255,0.4))",
-                  backgroundSize: "200% 200%",
-                  animation: "flowBorder 8s linear infinite",
-                }}
-              />
-            </div>
-
             <div
-              className="relative flex items-center justify-between"
-              style={{ gap: isDesktop ? gap : 12 }}
+              className="relative rounded-full overflow-hidden isolate"
+              style={frameStyle}
             >
-              {/* Brand */}
-              <Link href="/" className="flex items-center gap-2 select-none">
-                <Rocket className="w-4 h-4 text-gray-900 dark:text-gray-100 shrink-0" />
-                <span
-                  className="text-sm md:text-base font-semibold text-gray-900 dark:text-gray-100 overflow-hidden whitespace-nowrap"
-                  style={{
-                    opacity: isDesktop ? labelOpacity : 1,
-                    maxWidth: isDesktop ? labelMaxW : 200,
-                  }}
-                >
-                  PromptSwap
-                </span>
-              </Link>
+              <div
+                className="absolute inset-0 rounded-full -z-10"
+                style={glassBg}
+                aria-hidden="true"
+              />
+              <div
+                className="pointer-events-none absolute inset-0 rounded-full"
+                style={{
+                  boxShadow: isDark
+                    ? "inset 0 1px 0 rgba(255,255,255,0.05)"
+                    : "inset 0 1px 0 rgba(255,255,255,0.6)",
+                }}
+                aria-hidden="true"
+              />
+              
 
-              {/* Desktop nav links */}
-              <div className="hidden md:flex items-center" style={{ gap }}>
-                {navItems.map(({ href, label, icon: Icon }) =>
-                  showIconsOnly ? (
-                    <Tooltip key={label}>
-                      <TooltipTrigger asChild>
-                        <Link
-                          href={href}
-                          className="flex items-center text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
-                        >
-                          <Icon className="h-4 w-4" />
-                        </Link>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom">
-                        <p>{label}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  ) : (
-                    <Link
-                      key={label}
-                      href={href}
-                      className="flex items-center text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
-                      style={{ gap: 6 }}
-                    >
-                      <Icon className="h-4 w-4" />
-                      <span
-                        className="text-sm overflow-hidden whitespace-nowrap"
-                        style={{
-                          opacity: labelOpacity,
-                          maxWidth: labelMaxW,
-                        }}
+              <div
+                className="relative flex items-center justify-between subpixel-antialiased"
+                style={{
+                  gap: isDesktop ? gap : 12,
+                  padding: `${isDesktop ? padY : 10}px ${
+                    isDesktop ? padX : 14
+                  }px`,
+                }}
+              >
+                <Link href="/" className="flex items-center gap-2 select-none">
+                  <Book className="w-4 h-4 text-slate-900 dark:text-slate-100 shrink-0" />
+                  <span
+                    className="text-sm md:text-base font-semibold text-slate-900 dark:text-slate-100 overflow-hidden whitespace-nowrap"
+                    style={{
+                      opacity: isDesktop ? labelOpacity : 1,
+                      maxWidth: isDesktop ? labelMaxW : 200,
+                    }}
+                  >
+                    Cookbook
+                  </span>
+                </Link>
+
+                <div className="hidden md:flex items-center" style={{ gap }}>
+                  {navItems.map(({ href, label, icon: Icon }) =>
+                    showIconsOnly ? (
+                      <Tooltip key={label}>
+                        <TooltipTrigger asChild>
+                          <Link
+                            href={href}
+                            className="flex items-center text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+                          >
+                            <Icon className="h-4 w-4" />
+                          </Link>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          <p>{label}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      <Link
+                        key={label}
+                        href={href}
+                        className="flex items-center text-slate-800 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white"
+                        style={{ gap: 6 }}
                       >
-                        {label}
-                      </span>
-                    </Link>
-                  )
-                )}
-              </div>
-
-              {/* Right actions */}
-              <div className="hidden md:flex items-center" style={{ gap: 12 }}>
-                <Link
-                  href="#"
-                  className="flex items-center text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
-                  style={{ gap: 4 }}
-                >
-                  <LogIn className="h-4 w-4" />
-                  <span className="text-xs md:text-sm">Login</span>
-                </Link>
-
-                <Link
-                  href="#"
-                  className="rounded-full bg-gray-900 dark:bg-white text-white dark:text-black text-xs md:text-sm hover:opacity-90 transition px-3.5 py-1.5 md:px-4 md:py-2"
-                >
-                  {isDesktop && progress >= 0.55 ? "Start" : "Get Started"}
-                </Link>
-              </div>
-
-              {/* Mobile CTA + hamburger */}
-              <div className="md:hidden flex items-center gap-2">
-                <Link
-                  href="#"
-                  className="rounded-full bg-gray-900 text-white text-xs hover:bg-gray-800 px-3 py-1.5"
-                >
-                  Start
-                </Link>
-                <button
-                  aria-label="Toggle menu"
-                  aria-expanded={mobileOpen}
-                  onClick={() => setMobileOpen((v) => !v)}
-                  className="p-2 rounded-full text-gray-800 dark:text-gray-200"
-                >
-                  {mobileOpen ? (
-                    <X className="h-5 w-5" />
-                  ) : (
-                    <Menu className="h-5 w-5" />
+                        <Icon className="h-4 w-4" />
+                        <span
+                          className="text-sm overflow-hidden whitespace-nowrap"
+                          style={{
+                            opacity: labelOpacity,
+                            maxWidth: labelMaxW,
+                          }}
+                        >
+                          {label}
+                        </span>
+                      </Link>
+                    )
                   )}
-                </button>
-              </div>
-            </div>
-          </div>
+                </div>
 
-          {/* Mobile dropdown */}
-          {mobileOpen && (
-            <div className="md:hidden absolute left-0 right-0 mt-2 z-50">
-              <div className="bg-white/95 dark:bg-black/80 backdrop-blur-lg rounded-2xl border border-gray-200 dark:border-gray-700 shadow-lg p-4">
-                <div className="flex flex-col">
-                  {navItems.map(({ href, label, icon: Icon }) => (
-                    <Link
-                      key={label}
-                      href={href}
-                      className="flex items-center gap-3 py-2 text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white"
-                      onClick={() => setMobileOpen(false)}
-                    >
-                      <Icon className="h-5 w-5" />
-                      <span className="text-sm">{label}</span>
-                    </Link>
-                  ))}
-                  <div className="h-px bg-gray-200 dark:bg-gray-700 my-2" />
+                <div
+                  className="hidden md:flex items-center"
+                  style={{ gap: 12 }}
+                >
                   <Link
                     href="#"
-                    className="flex items-center gap-3 py-2 text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white"
-                    onClick={() => setMobileOpen(false)}
+                    className="rounded-full text-white dark:text-black text-xs md:text-sm transition-transform"
+                    style={{
+                      padding: "8px 14px",
+                      background: isDark
+                        ? "linear-gradient(180deg, rgba(250,250,250,0.92), rgba(250,250,250,0.80))"
+                        : "linear-gradient(180deg, rgba(15,23,42,0.92), rgba(15,23,42,0.80))",
+                      color: isDark ? "#0B1220" : "#FFFFFF",
+                      border: isDark
+                        ? "1px solid rgba(255,255,255,0.16)"
+                        : "1px solid rgba(255,255,255,0.22)",
+                    }}
                   >
-                    <LogIn className="h-5 w-5" />
-                    <span className="text-sm">Login</span>
+                    {isDesktop && progress >= 0.55 ? "Start" : "Get Started"}
                   </Link>
+                </div>
+
+                <div className="md:hidden flex items-center gap-2">
+                  <button
+                    aria-label="Toggle menu"
+                    aria-expanded={mobileOpen}
+                    onClick={() => setMobileOpen((v) => !v)}
+                    className="p-2 rounded-full text-slate-900 dark:text-slate-200 hover:bg-white/40 dark:hover:bg-white/5 transition-colors"
+                    style={{
+                      border: isDark
+                        ? "1px solid rgba(255,255,255,0.10)"
+                        : "1px solid rgba(255,255,255,0.45)",
+                      background: isDark
+                        ? "linear-gradient(180deg, rgba(15,23,42,0.40), rgba(15,23,42,0.28))"
+                        : "linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,255,255,0.35))",
+                    }}
+                  >
+                    {mobileOpen ? (
+                      <X className="h-5 w-5" />
+                    ) : (
+                      <Menu className="h-5 w-5" />
+                    )}
+                  </button>
                 </div>
               </div>
             </div>
-          )}
-        </nav>
 
-        {mounted && (
-          <button
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            aria-label="Toggle theme"
-            aria-pressed={theme === "dark"}
-            className="relative group w-11 h-11 rounded-full overflow-hidden select-none flowBorder"
-            style={{
-              border: "1px solid transparent",
-              background:
-                "linear-gradient(140deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.10) 100%) padding-box, \
-         linear-gradient(120deg, rgba(255,255,255,0.6), rgba(255,255,255,0.08), rgba(255,255,255,0.35)) border-box",
-              backdropFilter: "blur(18px) saturate(180%)",
-              WebkitBackdropFilter: "blur(18px) saturate(180%)",
-              boxShadow:
-                "0 8px 24px rgba(0,0,0,0.08), inset 0 1px 2px rgba(255,255,255,0.35)",
-              transition:
-                "transform 480ms cubic-bezier(0.22,1,0.36,1), box-shadow 480ms cubic-bezier(0.22,1,0.36,1), background 480ms ease",
-            }}
-            onMouseDown={(e) => e.currentTarget.classList.add("scale-95")}
-            onMouseUp={(e) => e.currentTarget.classList.remove("scale-95")}
-          >
-            <span
-              className="pointer-events-none absolute inset-0 rounded-full"
+            {mobileOpen && (
+              <div className="md:hidden absolute left-0 right-0 mt-2 z-50">
+                <div className="rounded-2xl shadow-lg p-4" style={panelStyle}>
+                  <div className="flex flex-col">
+                    {navItems.map(({ href, label, icon: Icon }) => (
+                      <Link
+                        key={label}
+                        href={href}
+                        className="flex items-center gap-3 py-2 text-slate-800 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white"
+                        onClick={() => setMobileOpen(false)}
+                      >
+                        <Icon className="h-5 w-5" />
+                        <span className="text-sm">{label}</span>
+                      </Link>
+                    ))}
+                    <div className="h-px my-2 bg-white/40 dark:bg-white/10" />
+                    <Link
+                      href="#"
+                      className="flex items-center gap-3 py-2 text-slate-800 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white"
+                      onClick={() => setMobileOpen(false)}
+                    >
+                      <span className="text-sm">Get Started</span>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            )}
+          </nav>
+
+          {mounted && (
+            <button
+              onClick={() =>
+                setTheme(resolvedTheme === "dark" ? "light" : "dark")
+              }
+              aria-label="Toggle theme"
+              aria-pressed={resolvedTheme === "dark"}
+              className="relative w-11 h-11 rounded-full flex items-center justify-center subpixel-antialiased"
               style={{
-                padding: "1px",
-                background:
-                  "linear-gradient(120deg, rgba(255,255,255,0.55), rgba(255,255,255,0.06), rgba(255,255,255,0.35))",
-                backgroundSize: "200% 200%",
-                animation: "flowBorder 10s linear infinite",
-                borderRadius: "9999px",
+                border: isDark
+                  ? "1px solid rgba(255,255,255,0.10)"
+                  : "1px solid rgba(0,0,0,0.08)",
+                background: isDark
+                  ? "linear-gradient(180deg, rgba(15,23,42,0.50), rgba(15,23,42,0.32))"
+                  : "linear-gradient(180deg, rgba(255,255,255,0.65), rgba(255,255,255,0.38))",
+                boxShadow: isDark
+                  ? "0 8px 24px rgba(0,0,0,0.35)"
+                  : "0 8px 24px rgba(2,6,23,0.12)",
+                transition: "transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1)",
               }}
-            />
-
-            <span className="pointer-events-none absolute inset-0 rounded-full overflow-hidden">
+              onMouseDown={(e) => e.currentTarget.classList.add("scale-95")}
+              onMouseUp={(e) => e.currentTarget.classList.remove("scale-95")}
+            >
               <span
-                className="absolute w-[180%] h-full opacity-10 group-hover:opacity-20 transition-opacity bg-gradient-to-r from-transparent via-white to-transparent"
+                className="pointer-events-none absolute inset-0 rounded-full"
                 style={{
-                  transform: "translateX(-100%) rotate(15deg)",
-                  animation: "sheen 9s linear infinite",
+                  boxShadow: isDark
+                    ? "inset 0 1px 0 rgba(255,255,255,0.05)"
+                    : "inset 0 1px 0 rgba(255,255,255,0.65)",
                 }}
               />
-            </span>
-
-            <span className="relative z-10 flex items-center justify-center w-full h-full">
-              <span
-                className={`absolute transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-                  theme === "dark"
-                    ? "opacity-100 scale-100 rotate-0"
-                    : "opacity-0 scale-75 -rotate-45"
-                }`}
-              >
-                <Sun className="h-5 w-5 dark:text-slate-700 text-slate-200" />
+              <span className="relative z-10">
+                {resolvedTheme === "dark" ? (
+                  <Sun className="h-5 w-5 text-slate-200" />
+                ) : (
+                  <Moon className="h-5 w-5 text-slate-700" />
+                )}
               </span>
-
-              <span
-                className={`absolute transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-                  theme === "dark"
-                    ? "opacity-0 scale-75 rotate-45"
-                    : "opacity-100 scale-100 rotate-0"
-                }`}
-              >
-                <Moon className="h-5 w-5 text-slate-700 dark:text-slate-200" />
-              </span>
-            </span>
-          </button>
-        )}
+            </button>
+          )}
+        </div>
       </div>
     </TooltipProvider>
   );
