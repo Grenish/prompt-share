@@ -22,6 +22,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { createClient as createSupabaseBrowserClient } from "@/util/supabase/client";
 
 /** Simple media query hook */
 function useMediaQuery(query: string) {
@@ -118,10 +119,28 @@ function useSpringNumber(
 export default function Navbar() {
   const isDesktop = useMediaQuery("(min-width: 778px)");
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
 
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+
+  // Supabase auth state on the client
+  useEffect(() => {
+    const supabase = createSupabaseBrowserClient();
+    let active = true;
+    supabase.auth.getUser().then(({ data }) => {
+      if (!active) return;
+      setIsLoggedIn(!!data.user);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((evt, session) => {
+      setIsLoggedIn(!!session?.user);
+    });
+    return () => {
+      active = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
 
   // Scroll → target progress (0 → 1)
   const [scrollTarget, setScrollTarget] = useState(0);
@@ -300,12 +319,9 @@ export default function Navbar() {
                   )}
                 </div>
 
-                <div
-                  className="hidden md:flex items-center"
-                  style={{ gap: 12 }}
-                >
+                <div className="hidden md:flex items-center" style={{ gap: 12 }}>
                   <Link
-                    href="#"
+                    href={isLoggedIn ? "/dashboard" : "/signup"}
                     className="rounded-full text-white dark:text-black text-xs md:text-sm transition-transform"
                     style={{
                       padding: "8px 14px",
@@ -318,7 +334,11 @@ export default function Navbar() {
                         : "1px solid rgba(255,255,255,0.22)",
                     }}
                   >
-                    {isDesktop && progress >= 0.55 ? "Start" : "Get Started"}
+                    {isLoggedIn
+                      ? "Dashboard"
+                      : isDesktop && progress >= 0.55
+                      ? "Start"
+                      : "Get Started"}
                   </Link>
                 </div>
 
@@ -364,11 +384,11 @@ export default function Navbar() {
                     ))}
                     <div className="h-px my-2 bg-white/40 dark:bg-white/10" />
                     <Link
-                      href="#"
+                      href={isLoggedIn ? "/dashboard" : "/signup"}
                       className="flex items-center gap-3 py-2 text-slate-800 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white"
                       onClick={() => setMobileOpen(false)}
                     >
-                      <span className="text-sm">Get Started</span>
+                      <span className="text-sm">{isLoggedIn ? "Dashboard" : "Get Started"}</span>
                     </Link>
                   </div>
                 </div>
