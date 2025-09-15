@@ -49,7 +49,7 @@ export default function Hero() {
               </h1>
 
               <p className="mt-5 max-w-2xl text-base md:text-lg leading-relaxed text-muted-foreground font-light mx-auto lg:mx-0">
-                Share and remix high‑quality prompts. Discover what works, save
+                Share and remix high-quality prompts. Discover what works, save
                 time, and collaborate with a global community.
               </p>
 
@@ -103,20 +103,22 @@ export default function Hero() {
 
                     <p className="text-sm leading-relaxed text-foreground/90">
                       I am{" "}
-                      <code className="bg-muted/50 rounded px-1 py-0.5 font-mono text-xs">
+                      <code className="bg-muted/50 rounded px-1 py-0.5 font-mono text-xs italic">
                         [describe the problem you're facing with background
                         context]
                       </code>
                       . Generate 10 innovative marketing campaign ideas for
-                      [industry or business type, e.g., eco-friendly brands,
-                      SaaS products, handmade jewelry], and for each idea
-                      provide a campaign theme/concept, a catchy tagline, the
-                      main objective, at least three specific tactics or
-                      channels (e.g., social media, influencers, email,
-                      guerrilla marketing), and a brief note on why it would
-                      appeal to the intended target audience. Present the output
-                      in a clear numbered list, written concisely in the style
-                      of professional marketing briefs.
+                      <code className="bg-muted/50 rounded px-1 py-0.5 font-mono text-xs italic">
+                        [industry or business type, e.g., eco-friendly brands,
+                        SaaS products, handmade jewelry]
+                      </code>
+                      , and for each idea provide a campaign theme/concept, a
+                      catchy tagline, the main objective, at least three
+                      specific tactics or channels (e.g., social media,
+                      influencers, email, guerrilla marketing), and a brief note
+                      on why it would appeal to the intended target audience.
+                      Present the output in a clear numbered list, written
+                      concisely in the style of professional marketing briefs.
                     </p>
 
                     <div className="mt-4 flex items-center justify-between">
