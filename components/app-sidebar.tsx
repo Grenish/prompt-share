@@ -15,12 +15,13 @@ import { UserButton } from "@/components/userButton";
 import { createClient } from "@/util/supabase/server";
 import { normalizeUser } from "@/lib/normalizeUser";
 import SidebarMenuButtonTrigger from "./sidebar-menu-button";
+import Link from "next/link";
 
 const navItems = [
-  { title: "Home", href: "#", icon: Home },
-  { title: "Profile", href: "#", icon: UserIcon },
-  { title: "Explore", href: "#", icon: Search },
-  { title: "Create", href: "#", icon: PlusCircle },
+  { title: "Home", href: "/dashboard", icon: Home },
+  { title: "Profile", href: "/profile", icon: UserIcon },
+  { title: "Explore", href: "/explore", icon: Search },
+  { title: "Create", href: "/create", icon: PlusCircle },
 ];
 
 export async function AppSidebar() {
@@ -63,12 +64,12 @@ export async function AppSidebar() {
                         group-data-[collapsible=icon]:justify-center
                       "
                     >
-                      <a href={item.href}>
+                      <Link href={item.href}>
                         <Icon className="size-5 shrink-0" />
                         <span className="group-data-[collapsible=icon]:hidden">
                           {item.title}
                         </span>
-                      </a>
+                      </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );
@@ -82,6 +83,7 @@ export async function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <UserButton
+              userId={user?.id}
               name={user?.displayName || ""}
               email={user?.email || ""}
               imageSrc={user?.avatarUrl ?? null}
