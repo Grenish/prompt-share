@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { DoorOpen, Settings } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -12,11 +11,14 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogTrigger } from "@/components/ui/dialog";
+import { SettingsDialog } from "@/components/settings-dialog";
 import { SidebarMenuButton } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { logout } from "@/util/actions";
 
 type UserButtonProps = {
+  userId?: string;
   name: string;
   email: string;
   imageSrc?: string | null;
@@ -25,6 +27,7 @@ type UserButtonProps = {
 };
 
 export function UserButton({
+  userId,
   name,
   email,
   imageSrc = null,
@@ -46,8 +49,9 @@ export function UserButton({
   const showImage = Boolean(imageSrc) && !imgError;
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
+    <Dialog>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
         <SidebarMenuButton
           size="lg"
           tooltip={trimmedName || "Account"}
@@ -89,77 +93,87 @@ export function UserButton({
         </SidebarMenuButton>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent
-        side="top"
-        align="start"
-        sideOffset={8}
-        className={cn(
-          "w-72 rounded-lg border border-sidebar-border bg-popover text-popover-foreground shadow-xl outline-none",
-          "animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
-        )}
-      >
-        <DropdownMenuLabel className="p-0">
-          <div className="flex items-center gap-3 rounded-md border border-sidebar-border bg-muted/50 p-2.5">
-            <Avatar className="h-9 w-9 ring-1 ring-sidebar-border">
-              {showImage && (
-                <AvatarImage
-                  src={imageSrc as string}
-                  alt={trimmedName || "User"}
-                  loading="lazy"
-                />
-              )}
-              <AvatarFallback className="bg-secondary text-secondary-foreground">
-                {initials}
-              </AvatarFallback>
-            </Avatar>
-            <div className="min-w-0">
-              <div className="truncate text-sm font-medium">
-                {trimmedName || "User"}
-              </div>
-              <div
-                className="truncate text-xs text-muted-foreground"
-                title={email}
-              >
-                {email}
+        <DropdownMenuContent
+          side="top"
+          align="start"
+          sideOffset={8}
+          className={cn(
+            "w-72 rounded-lg border border-sidebar-border bg-popover text-popover-foreground shadow-xl outline-none",
+            "animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
+          )}
+        >
+          <DropdownMenuLabel className="p-0">
+            <div className="flex items-center gap-3 rounded-md border border-sidebar-border bg-muted/50 p-2.5">
+              <Avatar className="h-9 w-9 ring-1 ring-sidebar-border">
+                {showImage && (
+                  <AvatarImage
+                    src={imageSrc as string}
+                    alt={trimmedName || "User"}
+                    loading="lazy"
+                  />
+                )}
+                <AvatarFallback className="bg-secondary text-secondary-foreground">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0">
+                <div className="truncate text-sm font-medium">
+                  {trimmedName || "User"}
+                </div>
+                <div
+                  className="truncate text-xs text-muted-foreground"
+                  title={email}
+                >
+                  {email}
+                </div>
               </div>
             </div>
-          </div>
-        </DropdownMenuLabel>
+          </DropdownMenuLabel>
 
-        <DropdownMenuSeparator />
+          <DropdownMenuSeparator />
 
-        <DropdownMenuItem
-          className={cn(
-            "p-0",
-            "data-[highlighted]:bg-sidebar-accent data-[highlighted]:text-sidebar-accent-foreground"
-          )}
-        >
-          <Link
-            href={settingsHref}
-            className="flex w-full items-center px-2 py-1.5 text-sm hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-sm"
+          <DropdownMenuItem
+            className={cn(
+              "p-0",
+              "data-[highlighted]:bg-sidebar-accent data-[highlighted]:text-sidebar-accent-foreground"
+            )}
           >
-            <Settings className="mr-2 h-4 w-4" />
-            <span>Settings</span>
-          </Link>
-        </DropdownMenuItem>
+            <DialogTrigger asChild>
+              <button
+                type="button"
+                className="flex w-full items-center px-2 py-1.5 text-sm hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-sm"
+              >
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Settings</span>
+              </button>
+            </DialogTrigger>
+          </DropdownMenuItem>
 
-        <DropdownMenuItem
-          className={cn(
-            "p-0",
-            "data-[highlighted]:bg-sidebar-accent data-[highlighted]:text-sidebar-accent-foreground"
-          )}
-        >
-          <form action={logout} className="flex w-full">
-            <button
-              type="submit"
-              className="flex w-full items-center px-2 py-1.5 text-sm hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-sm"
-            >
-              <DoorOpen className="mr-2 h-4 w-4" />
-              <span>Logout</span>
-            </button>
-          </form>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          <DropdownMenuItem
+            className={cn(
+              "p-0",
+              "data-[highlighted]:bg-sidebar-accent data-[highlighted]:text-sidebar-accent-foreground"
+            )}
+          >
+            <form action={logout} className="flex w-full">
+              <button
+                type="submit"
+                className="flex w-full items-center px-2 py-1.5 text-sm hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-sm"
+              >
+                <DoorOpen className="mr-2 h-4 w-4" />
+                <span>Logout</span>
+              </button>
+            </form>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <SettingsDialog
+        userId={userId || "self"}
+        name={trimmedName}
+        email={email}
+        imageSrc={imageSrc}
+      />
+    </Dialog>
   );
 }
