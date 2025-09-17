@@ -15,7 +15,7 @@ export default async function DashboardLayout({
   return (
     <SidebarProvider defaultOpen={defaultOpen}>
       <AppSidebar />
-      <main>{children}</main>
+      <main className="flex-1 w-full min-w-0">{children}</main>
       <Toaster position="top-right" richColors closeButton/>
     </SidebarProvider>
   );
