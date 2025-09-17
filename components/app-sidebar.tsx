@@ -1,4 +1,11 @@
-import { Home, PlusCircle, Search, User as UserIcon } from "lucide-react";
+import {
+  Award,
+  Bell,
+  Home,
+  PlusCircle,
+  Search,
+  User as UserIcon,
+} from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -17,11 +24,15 @@ import { normalizeUser } from "@/lib/normalizeUser";
 import SidebarMenuButtonTrigger from "./sidebar-menu-button";
 import Link from "next/link";
 
+const basePath = "/dashboard";
+
 const navItems = [
-  { title: "Home", href: "/dashboard", icon: Home },
-  { title: "Profile", href: "/profile", icon: UserIcon },
-  { title: "Explore", href: "/explore", icon: Search },
-  { title: "Create", href: "/create", icon: PlusCircle },
+  { title: "Home", href: `${basePath}`, icon: Home },
+  { title: "Profile", href: `${basePath}/profile`, icon: UserIcon },
+  { title: "Explore", href: `${basePath}/explore`, icon: Search },
+  { title: "Notifications", href: `${basePath}/notifications`, icon: Bell },
+  { title: "Leaderboard", href: `${basePath}/leaderboard`, icon: Award },
+  { title: "Create", href: `${basePath}/create`, icon: PlusCircle },
 ];
 
 export async function AppSidebar() {
