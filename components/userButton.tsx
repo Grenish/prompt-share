@@ -15,7 +15,7 @@ import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import { SettingsDialog } from "@/components/settings/settings-dialog";
 import { SidebarMenuButton } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
-import { logout } from "@/util/actions";
+import { logout } from "@/util/actions/authActions";
 
 type UserButtonProps = {
   userId?: string;
