@@ -14,7 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea"; // shadcn component
-import { updateProfileSettings, type UpdateProfileSettingsState } from "@/util/actions";
+import { updateProfileSettings, type UpdateProfileSettingsState } from "@/util/actions/profileActions";
 import { Image as ImageIcon, Upload, X, Loader2, Trash2 } from "lucide-react"; // icons
 
 const BIO_MAX = 160;
