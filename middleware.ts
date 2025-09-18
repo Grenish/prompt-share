@@ -14,7 +14,8 @@ export const config = {
      * - favicon.ico (favicon file)
      * Feel free to modify this pattern to include more paths.
      */
-  // Exclude public routes: '/', '/login', '/signup'
-  '/((?!$|login|signup|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  // Intercept root and all routes except explicit public/static ones
+  '/',
+  '/((?!login|signup|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
