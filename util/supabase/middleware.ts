@@ -56,6 +56,29 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // If user is authenticated and hits root, redirect to dashboard
+  if (user && request.nextUrl.pathname === "/") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/dashboard";
+    const redirectResponse = NextResponse.redirect(url);
+    // Copy over any cookies set by Supabase (preserve session cookies)
+    supabaseResponse.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(
+        cookie.name,
+        cookie.value,
+        {
+          path: cookie.path,
+          httpOnly: cookie.httpOnly,
+          sameSite: cookie.sameSite as any,
+          secure: cookie.secure,
+          expires: cookie.expires,
+          maxAge: cookie.maxAge,
+        }
+      );
+    });
+    return redirectResponse;
+  }
+
   // IMPORTANT: You *must* return the supabaseResponse object as it is.
   // If you're creating a new response object with NextResponse.next() make sure to:
   // 1. Pass the request in it, like so:
