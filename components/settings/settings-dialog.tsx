@@ -49,13 +49,15 @@ import {
   type LucideIcon,
   Bird,
   Citrus,
+  Music,
+  Code,
 } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/util/supabase/client";
 import {
   updateProfileAvatar,
   type UpdateProfileAvatarState,
-} from "@/util/actions";
+} from "@/util/actions/profileActions";
 import { useTheme } from "next-themes";
 import { SectionHeader } from "./section-header";
 import SettingsUserCard from "./settings-user-card";
@@ -106,12 +108,12 @@ const COLOR_PALETTES: ColorPaletteConfig[] = [
     description: "Clean and modern appearance",
     icon: Sparkles,
     preview: {
-      primary: "bg-blue-600",
-      secondary: "bg-yellow-500",
-      accent: "bg-gray-200",
-      muted: "bg-gray-100",
-      background: "bg-white",
-      foreground: "bg-gray-900",
+      primary: "bg-[#e5e5e5]",
+      secondary: "bg-[#262626]",
+      accent: "bg-[#404040]",
+      muted: "bg-[#262626]",
+      background: "bg-[#0a0a0a]",
+      foreground: "bg-[#fafafa]",
     },
   },
   {
@@ -197,6 +199,48 @@ const COLOR_PALETTES: ColorPaletteConfig[] = [
       background: "bg-[#1c2433]",
       foreground: "bg-[#e5e5e5]",
     }
+  },
+  {
+    id: "spotify",
+    label: "Spotify",
+    description: "Dark theme inspired by Spotify",
+    icon: Music,
+    preview: {
+      primary: "bg-[#00b262]",
+      secondary: "bg-[#282d3d]",
+      accent: "bg-[#282d3d]",
+      muted: "bg-[#282d3d]",
+      background: "bg-[#080b14]",
+      foreground: "bg-[#e9f0f5]",
+    },
+  },
+  {
+    id: "vs-code",
+    label: "VS Code",
+    description: "Inspired by Visual Studio Code",
+    icon: Code,
+    preview: {
+      primary: "bg-[#26acf4]",
+      secondary: "bg-[#232838]",
+      accent: "bg-[#232838]",
+      muted: "bg-[#232838]",
+      background: "bg-[#0e111b]",
+      foreground: "bg-[#d8dfe4]",
+    }
+  },
+  {
+    id: "caffeine",
+    label: "Caffeine",
+    description: "High contrast for focus",
+    icon: Coffee,
+    preview: {
+      primary: "bg-[#fcdfc2]",
+      secondary: "bg-[#3a3128]",
+      accent: "bg-[#2b2b2b]",
+      muted: "bg-[#222222]",
+      background: "bg-[#121212]",
+      foreground: "bg-[#eeeeee]",
+    },
   }
 ];
 
