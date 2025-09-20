@@ -1,3 +1,4 @@
+import UserCard from "@/components/explore/user-card";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 
@@ -15,6 +16,19 @@ export default function DashboardExplorePage() {
           </div>
         </div>
       </header>
+
+      <div className="pt-5 px-4">
+        <UserCard
+          name="John Doe"
+          username="johndoe"
+          avatarUrl=""
+          bio="This is a sample bio for John Doe."
+          bannerUrl=""
+          followers={100}
+          following={50}
+          numPosts={10}
+        />
+      </div>
     </div>
   );
 }
