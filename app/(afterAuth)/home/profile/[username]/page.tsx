@@ -1,12 +1,5 @@
 import { createClient } from "@/util/supabase/server";
-import { normalizeUser } from "@/lib/normalizeUser";
 import Image from "next/image";
-import {
-  fetchFollows,
-  updateUserInfo,
-  fetchAboutMe,
-  updateAboutMe,
-} from "@/util/actions/profileActions";
 import ProfileEditTrigger from "@/components/profile/profile-edit-trigger";
 import {
   PostFeed,
@@ -16,26 +9,84 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AboutMeSection } from "@/components/profile/about-me";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { notFound } from "next/navigation";
+import { FollowButton } from "@/components/profile/follow-button";
 
-export default async function DashboardProfilePage() {
+export default async function DashboardProfilePage({
+  params,
+}: {
+  params: Promise<{ username: string }> | { username: string };
+}) {
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user) {
-    throw new Error("User not authenticated");
-  }
-  const user = normalizeUser(data.user);
 
-  const [profileInfo, followCounts, aboutMe] = await Promise.all([
-    updateUserInfo(),
-    fetchFollows(),
-    fetchAboutMe(),
+  // Viewer (for auth + self-check)
+  const { data: viewerData } = await supabase.auth.getUser();
+  const viewerId = viewerData?.user?.id ?? null;
+
+  // Next.js 15: params should be awaited
+  const { username } = await (params as Promise<{ username: string }>);
+
+  // Load profile by username
+  const { data: profileRow, error: profileErr } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("username", username)
+    .maybeSingle();
+
+  if (profileErr) {
+    throw new Error(profileErr.message);
+  }
+  if (!profileRow) {
+    notFound();
+  }
+
+  const targetId = (profileRow as any).id as string;
+  const targetUsername = (profileRow as any).username as string | null;
+  const targetBio = (profileRow as any).bio as string | null;
+  const targetBackground = (profileRow as any).background_image as string | null;
+  const isSelf = viewerId && targetId === viewerId;
+  // Prefer a real display_name column if present; otherwise, use self auth metadata when viewing own profile
+  const targetDisplayName =
+    (profileRow as any)?.display_name ??
+    (isSelf
+      ? ((viewerData?.user?.user_metadata as any)?.display_name as string | null) ?? null
+      : null);
+  
+
+  // Counts
+  const [followersRes, followingRes, postsCountRes] = await Promise.all([
+    supabase
+      .from("follows")
+      .select("id", { count: "exact", head: true })
+      .eq("following_id", targetId),
+    supabase
+      .from("follows")
+      .select("id", { count: "exact", head: true })
+      .eq("follower_id", targetId),
+    supabase
+      .from("posts")
+      .select("id", { count: "exact", head: true })
+      .eq("author", targetId),
   ]);
 
-  // Fetch user's posts
+  const followersCount = followersRes.count ?? 0;
+  const followingCount = followingRes.count ?? 0;
+  const postsTotal = postsCountRes.count ?? 0;
+
+  // About
+  const { data: aboutRow } = await supabase
+    .from("abouts")
+    .select("content")
+    .eq("user_id", targetId)
+    .maybeSingle();
+
+  const aboutContent = (aboutRow as any)?.content ?? null;
+
+  // Posts by target user
   const { data: postRows } = await supabase
     .from("posts")
     .select("*")
-    .eq("author", user!.id)
+    .eq("author", targetId)
     .order("created_at", { ascending: false });
 
   const imageExts = ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif"];
@@ -54,10 +105,10 @@ export default async function DashboardProfilePage() {
   const posts: FeedPost[] = (postRows || []).map((row: any) => ({
     id: String(row.id),
     user: {
-      id: user!.id,
-      name: user!.displayName || "Unknown User",
-      username: profileInfo?.profile?.username || undefined,
-      avatarUrl: user!.avatarUrl || undefined,
+      id: targetId,
+      name: targetDisplayName || targetUsername || "Unknown User",
+      username: targetUsername || undefined,
+      avatarUrl: undefined,
       verified: false,
     },
     createdAt: row.created_at ?? Date.now(),
@@ -93,10 +144,10 @@ export default async function DashboardProfilePage() {
     <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto">
         <div className="relative">
-          {profileInfo?.profile?.backgroundUrl && (
+          {targetBackground && (
             <div className="absolute inset-0 h-[280px] sm:h-[300px] overflow-hidden">
               <Image
-                src={profileInfo.profile.backgroundUrl}
+                src={targetBackground}
                 alt="Background"
                 fill
                 className="object-cover opacity-50"
@@ -111,19 +162,9 @@ export default async function DashboardProfilePage() {
             <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 md:gap-8 mb-6 sm:mb-8">
               <div className="relative flex-shrink-0">
                 <Avatar className="w-[100px] h-[100px] sm:w-[120px] sm:h-[120px] md:w-[150px] md:h-[150px] border border-border bg-background">
-                  <AvatarImage
-                    src={user?.avatarUrl || undefined}
-                    alt={`${
-                      user?.displayName ||
-                      profileInfo?.profile?.username ||
-                      "User"
-                    } avatar`}
-                  />
+                  <AvatarImage src={undefined} alt={`${targetDisplayName || targetUsername || "User"} avatar`} />
                   <AvatarFallback className="bg-muted text-foreground text-lg sm:text-xl md:text-2xl font-medium">
-                    {initialsFrom(
-                      user?.displayName,
-                      profileInfo?.profile?.username
-                    )}
+                    {initialsFrom(targetDisplayName, targetUsername)}
                   </AvatarFallback>
                 </Avatar>
 
@@ -135,41 +176,35 @@ export default async function DashboardProfilePage() {
                 <div className="flex flex-col sm:flex-row items-center sm:items-start sm:justify-between gap-3">
                   <div>
                     <h1 className="text-xl sm:text-2xl font-semibold text-foreground">
-                      {user?.displayName || "Unknown User"}
+                      {targetDisplayName || targetUsername || "Unknown User"}
                     </h1>
                     <p className="text-sm sm:text-base text-muted-foreground">
-                      @{profileInfo?.profile?.username || "username"}
+                      @{targetUsername || "username"}
                     </p>
                   </div>
-                  <ProfileEditTrigger
-                    initialBio={profileInfo?.profile?.bio ?? ""}
-                    initialBackgroundUrl={
-                      profileInfo?.profile?.backgroundUrl ?? null
-                    }
-                  />
+                  {isSelf ? (
+                    <ProfileEditTrigger
+                      initialBio={targetBio ?? ""}
+                      initialBackgroundUrl={targetBackground ?? null}
+                    />
+                  ) : (
+                    <FollowButton targetUserId={targetId} />
+                  )}
                 </div>
 
                 {/* Stats */}
                 <div className="flex justify-center sm:justify-start gap-6 md:gap-8">
                   <div className="text-center sm:text-left">
-                    <p className="font-semibold text-foreground text-sm sm:text-base">
-                      {followCounts?.followers ?? 0}
-                    </p>
-                    <p className="text-xs sm:text-sm text-muted-foreground">
-                      Followers
-                    </p>
+                    <p className="font-semibold text-foreground text-sm sm:text-base">{followersCount}</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground">Followers</p>
+                  </div>
+                  <div className="text-center sm:text-left">
+                    <p className="font-semibold text-foreground text-sm sm:text-base">{followingCount}</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground">Following</p>
                   </div>
                   <div className="text-center sm:text-left">
                     <p className="font-semibold text-foreground text-sm sm:text-base">
-                      {followCounts?.following ?? 0}
-                    </p>
-                    <p className="text-xs sm:text-sm text-muted-foreground">
-                      Following
-                    </p>
-                  </div>
-                  <div className="text-center sm:text-left">
-                    <p className="font-semibold text-foreground text-sm sm:text-base">
-                      {postCount}
+                      {postsTotal}
                     </p>
                     <p className="text-xs sm:text-sm text-muted-foreground">
                       Posts
@@ -178,10 +213,8 @@ export default async function DashboardProfilePage() {
                 </div>
 
                 {/* Bio */}
-                {profileInfo?.profile?.bio && (
-                  <p className="text-foreground/80 text-sm px-2 sm:px-0">
-                    {profileInfo.profile.bio}
-                  </p>
+                {targetBio && (
+                  <p className="text-foreground/80 text-sm px-2 sm:px-0">{targetBio}</p>
                 )}
               </div>
             </div>
@@ -226,16 +259,15 @@ export default async function DashboardProfilePage() {
             <TabsContent value="about" className="py-6 sm:py-8">
               <AboutMeSection
                 profileInfo={{
-                  bio:
-                    aboutMe?.content ?? profileInfo?.profile?.bio ?? undefined,
-                  backgroundUrl: profileInfo?.profile?.backgroundUrl ?? null,
+                  bio: aboutContent ?? targetBio ?? undefined,
+                  backgroundUrl: targetBackground ?? null,
                 }}
                 followCounts={{
-                  followers: followCounts?.followers ?? 0,
-                  following: followCounts?.following ?? 0,
+                  followers: followersCount,
+                  following: followingCount,
                 }}
-                postCount={postCount}
-                canEdit={true}
+                postCount={postsTotal}
+                canEdit={Boolean(isSelf)}
               />
             </TabsContent>
 
