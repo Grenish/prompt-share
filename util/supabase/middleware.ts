@@ -63,18 +63,14 @@ export async function updateSession(request: NextRequest) {
     const redirectResponse = NextResponse.redirect(url);
     // Copy over any cookies set by Supabase (preserve session cookies)
     supabaseResponse.cookies.getAll().forEach((cookie) => {
-      redirectResponse.cookies.set(
-        cookie.name,
-        cookie.value,
-        {
-          path: cookie.path,
-          httpOnly: cookie.httpOnly,
-          sameSite: cookie.sameSite as any,
-          secure: cookie.secure,
-          expires: cookie.expires,
-          maxAge: cookie.maxAge,
-        }
-      );
+      redirectResponse.cookies.set(cookie.name, cookie.value, {
+        path: cookie.path,
+        httpOnly: cookie.httpOnly,
+        sameSite: cookie.sameSite as any,
+        secure: cookie.secure,
+        expires: cookie.expires,
+        maxAge: cookie.maxAge,
+      });
     });
     return redirectResponse;
   }
