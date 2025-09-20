@@ -1,9 +1,3 @@
-// src/lib/media-optimizer.ts
-
-// Optional: to enable video optimization, install ffmpeg.wasm:
-//   npm i @ffmpeg/ffmpeg
-// This module will gracefully fall back (return original video) if ffmpeg is not available.
-
 export type OptimizeResult = {
   file: File;
   optimized: boolean;
@@ -19,7 +13,6 @@ export type OptimizeOptions = {
   maxImageHeight?: number; // default 2048
   imageQuality?: number; // default 0.82 (0-1)
   imageFormats?: string[]; // default ["image/webp", "image/jpeg", "image/png"]
-  // Global budget (applied to both image/video). If provided, optimizer tries to get under this size.
   maxBytes?: number;
 
   // Video options (require ffmpeg.wasm)
@@ -36,13 +29,14 @@ export type OptimizeOptions = {
       | "medium"
       | "slow"
       | "slower"
-      | "veryslow"; // default "veryfast"
+      | "veryslow";
     fps?: number; // optional (e.g., 30)
     videoBitrate?: string; // optional (e.g., "2500k")
     audioBitrate?: string; // default "128k"
     corePath?: string; // optional custom core path for ffmpeg.wasm
   };
 };
+
 
 const DEFAULTS: Required<
   Pick<OptimizeOptions, "maxImageWidth" | "maxImageHeight" | "imageQuality">
