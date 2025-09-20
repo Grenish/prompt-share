@@ -1,10 +1,10 @@
 "use client";
 
-import Image from "next/image";
+import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { SidebarMenuButton, useSidebar } from "./ui/sidebar";
 
 export default function SidebarMenuButtonTrigger() {
-  const { toggleSidebar } = useSidebar();
+  const { toggleSidebar, state } = useSidebar();
 
   return (
     <SidebarMenuButton
@@ -24,13 +24,22 @@ export default function SidebarMenuButtonTrigger() {
         aria-label="Cookbook"
         className="flex items-center w-full"
       >
-        <div className="relative size-8 w-full overflow-hidden rounded-md ring-1 ring-sidebar-border">
-          <Image
-            src="/img7.png"
-            alt="Cookbook"
-            className="size-full object-cover"
-            layout="fill"
-          />
+        <div className="relative w-full  overflow-hidden rounded-md ring-1 ring-sidebar-border">
+          <div
+            className={
+              state === "collapsed"
+                ? "size-10 mx-auto"
+                : "size-24 mx-auto"
+            }
+          >
+            <DotLottieReact
+              key={state}
+              src="/rainbow-remix.lottie"
+              loop
+              autoplay
+              className="w-full h-full"
+            />
+          </div>
         </div>
       </button>
     </SidebarMenuButton>
