@@ -43,7 +43,7 @@ import {
   ResizableHandle,
 } from "@/components/ui/resizable";
 
-import { Streamdown } from 'streamdown';
+import { Streamdown } from "streamdown";
 import { updateAboutMe } from "@/util/actions/profileActions";
 
 interface AboutMeSectionProps {
@@ -99,22 +99,31 @@ export function AboutMeSection({
     const el = viewRef.current;
     if (!el) return;
 
+    let raf = 0;
+
     const measure = () => {
-      const was = expanded;
-      if (was) setExpanded(false);
-      requestAnimationFrame(() => {
-        setIsOverflowing(el.scrollHeight > el.clientHeight + 1);
-        if (was) setExpanded(true);
-      });
+      if (!el) return;
+      // Only measure overflow when collapsed to avoid resize loops
+      if (!expanded) {
+        const overflowing = el.scrollHeight > el.clientHeight + 1;
+        setIsOverflowing(overflowing);
+      }
     };
 
-    const ro = new ResizeObserver(measure);
+    const onResize = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(measure);
+    };
+
+    const ro = new ResizeObserver(onResize);
     ro.observe(el);
-    window.addEventListener("resize", measure);
-    measure();
+    window.addEventListener("resize", onResize);
+    onResize();
+
     return () => {
+      cancelAnimationFrame(raf);
       ro.disconnect();
-      window.removeEventListener("resize", measure);
+      window.removeEventListener("resize", onResize);
     };
   }, [bio, expanded]);
 
@@ -190,31 +199,31 @@ export function AboutMeSection({
     requestAnimationFrame(() => ta.setSelectionRange(cursorStart, cursorEnd));
   }
 
-  function toggleLinePrefix(prefix: string) {
-    const ta = textareaRef.current;
-    if (!ta) return;
-    const { selectionStart, selectionEnd, value } = ta;
+function toggleLinePrefix(prefix: string) {
+  const ta = textareaRef.current;
+  if (!ta) return;
+  const { selectionStart, selectionEnd, value } = ta;
 
-    const start = value.lastIndexOf("\n", selectionStart - 1) + 1;
-    const endIdx = value.indexOf("\n", selectionEnd);
-    const end = endIdx === -1 ? value.length : endIdx;
+  const start = value.lastIndexOf("\n", selectionStart - 1) + 1;
+  const endIdx = value.indexOf("\n", selectionEnd);
+  const end = endIdx === -1 ? value.length : endIdx;
 
-    const block = value.slice(start, end);
-    const lines = block.split("\n");
-    const willRemove = lines.every((l) => l.startsWith(prefix));
-    const escaped = prefix.replace(/[-/\\^$*+?.()|[```{}]/g, "\\$&");
-    const newLines = lines.map((l) =>
-      willRemove ? l.replace(new RegExp("^" + escaped), "") : prefix + l
-    );
-    const replaced = newLines.join("\n");
-    const next = value.slice(0, start) + replaced + value.slice(end);
-    setDraft(next);
+  const block = value.slice(start, end);
+  const lines = block.split("\n");
 
-    const delta = replaced.length - block.length;
-    const newStart = start;
-    const newEnd = end + delta;
-    requestAnimationFrame(() => ta.setSelectionRange(newStart, newEnd));
-  }
+  const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const willRemove = lines.every((l) => l.startsWith(prefix));
+  const newLines = lines.map((l) =>
+    willRemove ? l.replace(new RegExp("^" + escaped), "") : prefix + l
+  );
+
+  const replaced = newLines.join("\n");
+  const next = value.slice(0, start) + replaced + value.slice(end);
+  setDraft(next);
+
+  const delta = replaced.length - block.length;
+  requestAnimationFrame(() => ta.setSelectionRange(start, end + delta));
+}
 
   function toggleHeading(level = 2) {
     toggleLinePrefix("#".repeat(level) + " ");
@@ -291,7 +300,7 @@ export function AboutMeSection({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="mt-2 h-7 px-2 text-xs font-medium"
+                    className="mt-2 h-7 px-2 text-xs relative font-medium"
                     onClick={() => setExpanded((v) => !v)}
                   >
                     {expanded ? (
@@ -636,47 +645,3 @@ function isMac() {
   if (typeof window === "undefined") return false;
   return /Mac|iPod|iPhone|iPad/.test(window.navigator.platform);
 }
-
-// function MarkdownRenderer({ children }: { children: string }) {
-//   return (
-//     <ReactMarkdown
-//       remarkPlugins={[remarkGfm]}
-//       components={{
-//         a: ({ node, ...props }) => (
-//           <a {...props} target="_blank" rel="noopener noreferrer" />
-//         ),
-//         img: ({ node, ...props }) => (
-//           // @ts-ignore
-//           <img {...props} className="rounded-lg border my-3" />
-//         ),
-//         code: ({ inline, className, children, ...props }) => {
-//           if (inline) {
-//             return (
-//               <code
-//                 className="rounded bg-muted px-1.5 py-0.5 text-xs"
-//                 {...props}
-//               >
-//                 {children}
-//               </code>
-//             );
-//           }
-//           return (
-//             <pre className="not-prose overflow-x-auto rounded-lg border bg-muted p-3 text-sm">
-//               <code className={className} {...props}>
-//                 {children}
-//               </code>
-//             </pre>
-//           );
-//         },
-//         table: ({ node, ...props }) => (
-//           <div className="not-prose overflow-x-auto rounded-lg border">
-//             {/* @ts-ignore */}
-//             <table className="w-full text-sm" {...props} />
-//           </div>
-//         ),
-//       }}
-//     >
-//       {children}
-//     </ReactMarkdown>
-//   );
-// }
