@@ -198,7 +198,7 @@ const COLOR_PALETTES: ColorPaletteConfig[] = [
       muted: "bg-[#2a303e]",
       background: "bg-[#1c2433]",
       foreground: "bg-[#e5e5e5]",
-    }
+    },
   },
   {
     id: "spotify",
@@ -226,7 +226,7 @@ const COLOR_PALETTES: ColorPaletteConfig[] = [
       muted: "bg-[#232838]",
       background: "bg-[#0e111b]",
       foreground: "bg-[#d8dfe4]",
-    }
+    },
   },
   {
     id: "caffeine",
@@ -241,7 +241,21 @@ const COLOR_PALETTES: ColorPaletteConfig[] = [
       background: "bg-[#121212]",
       foreground: "bg-[#eeeeee]",
     },
-  }
+  },
+  {
+    id: "nature",
+    label: "Nature",
+    description: "Earthy and natural tones",
+    icon: Flower2,
+    preview: {
+      primary: "bg-[#6a994e]",
+      secondary: "bg-[#a7c957]",
+      accent: "bg-[#f2e8cf]",
+      muted: "bg-[#386641]",
+      background: "bg-[#1e5128]",
+      foreground: "bg-[#f1faee]",
+    },
+  },
 ];
 
 const getPaletteConfig = (id: string): ColorPaletteConfig | undefined => {
@@ -581,9 +595,7 @@ export function SettingsDialog({
                 </section>
               )}
 
-              {active === "account" && (
-                <SettingsUserCard />
-              )}
+              {active === "account" && <SettingsUserCard />}
 
               {active === "security" && (
                 <section>
@@ -1194,7 +1206,6 @@ function formatFileSize(bytes: number): string {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return Math.round((bytes / Math.pow(k, i)) * 10) / 10 + " " + sizes[i];
 }
-
 
 function ToggleRow({
   label,
