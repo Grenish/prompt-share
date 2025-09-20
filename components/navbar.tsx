@@ -321,7 +321,7 @@ export default function Navbar() {
 
                 <div className="hidden md:flex items-center" style={{ gap: 12 }}>
                   <Link
-                    href={isLoggedIn ? "/dashboard" : "/signup"}
+                    href={isLoggedIn ? "/home" : "/signup"}
                     className="rounded-full text-white dark:text-black text-xs md:text-sm transition-transform"
                     style={{
                       padding: "8px 14px",
@@ -384,7 +384,7 @@ export default function Navbar() {
                     ))}
                     <div className="h-px my-2 bg-white/40 dark:bg-white/10" />
                     <Link
-                      href={isLoggedIn ? "/dashboard" : "/signup"}
+                      href={isLoggedIn ? "/home" : "/signup"}
                       className="flex items-center gap-3 py-2 text-slate-800 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white"
                       onClick={() => setMobileOpen(false)}
                     >
