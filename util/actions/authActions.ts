@@ -33,7 +33,40 @@ export async function login(formData: FormData) {
   });
 
   if (error) {
+    console.log("Login error:", error);
     redirect("/error");
+  }
+
+  revalidatePath("/", "layout");
+  redirect("/home");
+}
+
+export type LoginState = {
+  ok: boolean;
+  error?: string | null;
+};
+
+export async function loginAction(_prev: LoginState, formData: FormData): Promise<LoginState> {
+  const supabase = await createClient();
+
+  const LoginSchema = z.object({
+    email: EmailSchema,
+    password: PasswordSchema,
+  });
+
+  const parsed = LoginSchema.safeParse({
+    email: formData.get("email"),
+    password: formData.get("password"),
+  });
+  if (!parsed.success) {
+    return { ok: false, error: "Please enter a valid email and an 8+ char password." };
+  }
+
+  const { email, password } = parsed.data;
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) {
+    console.log("Login error:", error);
+    return { ok: false, error: "Invalid email or password." };
   }
 
   revalidatePath("/", "layout");
