@@ -59,7 +59,7 @@ export async function updateSession(request: NextRequest) {
   // If user is authenticated and hits root, redirect to dashboard
   if (user && request.nextUrl.pathname === "/") {
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    url.pathname = "/home";
     const redirectResponse = NextResponse.redirect(url);
     // Copy over any cookies set by Supabase (preserve session cookies)
     supabaseResponse.cookies.getAll().forEach((cookie) => {
