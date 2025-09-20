@@ -258,9 +258,98 @@ export async function updateProfileSettings(
     }
 
     // Refresh the profile page
-    revalidatePath("/dashboard/profile");
+    revalidatePath("/home/profile");
 
     return { ok: true, bio: bio ?? undefined, backgroundUrl: newBackgroundUrl };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || "Unknown error" };
+  }
+}
+
+export type AboutMeResult = {
+  ok: boolean;
+  content?: string | null;
+  error?: string | null;
+};
+
+/**
+ * Fetch the current user's About content from the `abouts` table.
+ */
+export async function fetchAboutMe(): Promise<AboutMeResult> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return { ok: false, error: "Not authenticated" };
+  }
+
+  const { data, error } = await supabase
+    .from("abouts")
+    .select("content")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  return { ok: true, content: (data as any)?.content ?? null };
+}
+
+/**
+ * Update or create the current user's About content in the `abouts` table.
+ * Accepts either a plain string or a FormData with key `content`.
+ */
+export async function updateAboutMe(
+  input: string | FormData
+): Promise<AboutMeResult> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return { ok: false, error: "Not authenticated" };
+  }
+
+  const newContent =
+    typeof input === "string"
+      ? input
+      : typeof input.get("content") === "string"
+      ? String(input.get("content"))
+      : "";
+
+  try {
+    const { data: existing, error: fetchErr } = await supabase
+      .from("abouts")
+      .select("id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (fetchErr) return { ok: false, error: fetchErr.message };
+
+    if (existing?.id) {
+      const { error: updateErr } = await supabase
+        .from("abouts")
+        .update({ content: newContent, updated_at: new Date().toISOString() })
+        .eq("id", existing.id);
+      if (updateErr) return { ok: false, error: updateErr.message };
+    } else {
+      const { error: insertErr } = await supabase
+        .from("abouts")
+        .insert({ user_id: user.id, content: newContent });
+      if (insertErr) return { ok: false, error: insertErr.message };
+    }
+
+    revalidatePath("/home/profile");
+
+    return { ok: true, content: newContent };
   } catch (e: any) {
     return { ok: false, error: e?.message || "Unknown error" };
   }
