@@ -269,9 +269,9 @@ export default function Navbar() {
                 }}
               >
                 <Link href="/" className="flex items-center gap-2 select-none">
-                  <Book className="w-4 h-4 text-slate-900 dark:text-slate-100 shrink-0" />
+                  <Book className="w-4 h-4 text-foreground shrink-0" />
                   <span
-                    className="text-sm md:text-base font-semibold text-slate-900 dark:text-slate-100 overflow-hidden whitespace-nowrap"
+                    className="text-sm md:text-base font-semibold text-foreground overflow-hidden whitespace-nowrap"
                     style={{
                       opacity: isDesktop ? labelOpacity : 1,
                       maxWidth: isDesktop ? labelMaxW : 200,
@@ -288,7 +288,7 @@ export default function Navbar() {
                         <TooltipTrigger asChild>
                           <Link
                             href={href}
-                            className="flex items-center text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+                            className="flex items-center text-muted-foreground hover:text-foreground"
                           >
                             <Icon className="h-4 w-4" />
                           </Link>
@@ -301,7 +301,7 @@ export default function Navbar() {
                       <Link
                         key={label}
                         href={href}
-                        className="flex items-center text-slate-800 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white"
+                        className="flex items-center text-muted-foreground hover:text-foreground"
                         style={{ gap: 6 }}
                       >
                         <Icon className="h-4 w-4" />
@@ -322,7 +322,7 @@ export default function Navbar() {
                 <div className="hidden md:flex items-center" style={{ gap: 12 }}>
                   <Link
                     href={isLoggedIn ? "/home" : "/signup"}
-                    className="rounded-full text-white dark:text-black text-xs md:text-sm transition-transform"
+                    className="rounded-full text-foreground text-xs md:text-sm transition-transform"
                     style={{
                       padding: "8px 14px",
                       background: isDark
@@ -347,7 +347,7 @@ export default function Navbar() {
                     aria-label="Toggle menu"
                     aria-expanded={mobileOpen}
                     onClick={() => setMobileOpen((v) => !v)}
-                    className="p-2 rounded-full text-slate-900 dark:text-slate-200 hover:bg-white/40 dark:hover:bg-white/5 transition-colors"
+                    className="p-2 rounded-full text-foreground hover:bg-white/40 dark:hover:bg-white/5 transition-colors"
                     style={{
                       border: isDark
                         ? "1px solid rgba(255,255,255,0.10)"
@@ -375,7 +375,7 @@ export default function Navbar() {
                       <Link
                         key={label}
                         href={href}
-                        className="flex items-center gap-3 py-2 text-slate-800 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white"
+                        className="flex items-center gap-3 py-2 text-muted-foreground hover:text-foreground"
                         onClick={() => setMobileOpen(false)}
                       >
                         <Icon className="h-5 w-5" />
@@ -385,7 +385,7 @@ export default function Navbar() {
                     <div className="h-px my-2 bg-white/40 dark:bg-white/10" />
                     <Link
                       href={isLoggedIn ? "/home" : "/signup"}
-                      className="flex items-center gap-3 py-2 text-slate-800 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white"
+                      className="flex items-center gap-3 py-2 text-muted-foreground hover:text-foreground"
                       onClick={() => setMobileOpen(false)}
                     >
                       <span className="text-sm">{isLoggedIn ? "Dashboard" : "Get Started"}</span>
@@ -403,7 +403,7 @@ export default function Navbar() {
               }
               aria-label="Toggle theme"
               aria-pressed={resolvedTheme === "dark"}
-              className="relative w-11 h-11 rounded-full flex items-center justify-center subpixel-antialiased"
+              className="relative w-11 h-11 rounded-full flex items-center justify-center subpixel-antialiased backdrop-blur-md"
               style={{
                 border: isDark
                   ? "1px solid rgba(255,255,255,0.10)"
@@ -429,9 +429,9 @@ export default function Navbar() {
               />
               <span className="relative z-10">
                 {resolvedTheme === "dark" ? (
-                  <Sun className="h-5 w-5 text-slate-200" />
+                  <Sun className="h-5 w-5 text-foreground" />
                 ) : (
-                  <Moon className="h-5 w-5 text-slate-700" />
+                  <Moon className="h-5 w-5 text-foreground" />
                 )}
               </span>
             </button>
