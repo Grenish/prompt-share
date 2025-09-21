@@ -24,7 +24,7 @@ import { normalizeUser } from "@/lib/normalizeUser";
 import SidebarMenuButtonTrigger from "./sidebar-menu-button";
 import Link from "next/link";
 
-const basePath = "/dashboard";
+const basePath = "/home";
 
 const navItems = [
   { title: "Home", href: `${basePath}`, icon: Home },
