@@ -404,9 +404,14 @@ export function SettingsDialog({
           else if (result.publicUrl) setLocalAvatar(result.publicUrl);
         }
 
-        const updatePayload: any = {
-          data: { display_name: newName },
-        };
+        const updatePayload: any = {};
+        // Only update display_name when editing the Profile section and when a non-empty name is present.
+        if (section === "profile") {
+          const safeName = newName;
+          if (safeName && safeName !== trimmedName) {
+            updatePayload.data = { display_name: safeName };
+          }
+        }
         if (newEmail && newEmail !== email) updatePayload.email = newEmail;
         if (Object.keys(updatePayload).length > 0) {
           const { error: updateError } = await supabase.auth.updateUser(
