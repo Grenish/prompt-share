@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import UserCard from "@/components/explore/user-card";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Banana, Search } from "lucide-react";
 import { createClient } from "@/util/supabase/client";
 import HashTags from "@/components/explore/hashtags";
+import ModelCard from "@/components/explore/models-card";
 
 type ProfileRow = {
   id: string;
@@ -164,17 +165,61 @@ export default function DashboardExplorePage() {
       </div>
 
       <div className="pt-5 px-4 max-w-6xl mx-auto">
-        <h2 className="text-xl font-semibold">Explore the tags</h2>
-        <HashTags
-          hashtag="nanobanana"
-          photos={[
-            "/img1.png",
-            "/img2.png",
-            "/img3.png",
-            "/img4.png",
-            "/img5.png",
-          ]}
-        />
+        <h2 className="text-xl font-semibold mb-5">Explore by tags</h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mt-5">
+          <HashTags
+            hashtag="cinematic"
+            photos={[
+              "/img1.png",
+              "/img2.png",
+              "/img3.png",
+              "/img4.png",
+              "/img5.png",
+            ]}
+          />
+          <HashTags
+            hashtag="creative"
+            photos={[
+              "/img1.png",
+              "/img2.png",
+              "/img3.png",
+              "/img4.png",
+              "/img5.png",
+            ]}
+          />
+          <HashTags
+            hashtag="anime"
+            photos={[
+              "/img1.png",
+              "/img2.png",
+              "/img3.png",
+              "/img4.png",
+              "/img5.png",
+            ]}
+          />
+        </div>
+      </div>
+      <div className="pt-5 px-4 max-w-6xl mx-auto">
+        <h2 className="text-xl font-semibold mb-5">Explore by models</h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mt-5">
+          <ModelCard
+            model="gemini"
+            modelName="Nano Banana"
+            icon={<Banana className="ml-2 h-5 w-5 text-yellow-500" />}
+          />
+          <ModelCard
+            model="chatgpt"
+            modelName="Image"
+          />
+          <ModelCard
+            model="grok"
+            modelName="Imagine"
+          />
+          <ModelCard
+            model="midjourney"
+            modelName="Midjourney"
+          />
+        </div>
       </div>
     </div>
   );
