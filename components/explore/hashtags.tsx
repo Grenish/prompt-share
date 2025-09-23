@@ -15,34 +15,35 @@ export default function HashTags({
   const moreCount = Math.max(0, photos.length - 4);
   const showMore = moreCount > 0;
 
-  // If there are more than 4 photos, show the first 3 + a "+X" tile using the 4th photo as background.
+  // If more than 4 photos: show first 3 + "+X" tile using the 4th photo as background.
   const tiles = showMore ? photos.slice(0, 3) : photos.slice(0, 4);
 
   return (
     <Card
       className={[
-        "w-full max-w-sm h-[350px] overflow-hidden rounded-lg border bg-card shadow-sm transition-shadow hover:shadow-md",
+        "w-full max-w-sm h-[350px] flex flex-col overflow-hidden rounded-xl border bg-card shadow-sm p-2 gap-0",
         className || "",
       ].join(" ")}
     >
-      <CardHeader className="p-3">
-        <span className="inline-flex items-center rounded-full bg-muted/70 px-2.5 text-xs font-medium text-muted-foreground">
+      {/* Minimal header for a single hashtag */}
+      <CardHeader className="pt-1 px-0 mb-1">
+        <span className="inline-flex w-fit text-xl items-center rounded-full px-2 py-0.5 font-medium text-muted-foreground leading-none">
           #{hashtag}
         </span>
       </CardHeader>
 
-      <CardContent className="p-3 pt-0">
-        <div className="grid grid-cols-2 gap-1.5">
+      <CardContent className="flex-1 px-2 pb-2 ">
+        <div className="grid h-full grid-cols-2 grid-rows-2 gap-2">
           {tiles.map((src, idx) => (
             <div
               key={idx}
-              className="group relative aspect-square overflow-hidden rounded-md ring-1 ring-border/50"
+              className="group relative h-full w-full overflow-hidden rounded-xl border border-border"
             >
               <Image
                 src={src}
                 alt={`#${hashtag} photo ${idx + 1}`}
                 fill
-                sizes="120px"
+                sizes="(max-width: 640px) 45vw, 180px"
                 className="object-cover transition-transform duration-200 group-hover:scale-[1.03]"
                 draggable={false}
               />
@@ -50,19 +51,18 @@ export default function HashTags({
           ))}
 
           {showMore && (
-            <div className="relative aspect-square overflow-hidden rounded-md ring-1 ring-border/50">
-              {/* Use the 4th photo as a blurred, dimmed background for a nicer +X tile */}
+            <div className="relative h-full w-full overflow-hidden rounded-xl border border-border">
               <Image
                 src={photos[3]}
                 alt={`+${moreCount} more for #${hashtag}`}
                 fill
-                sizes="120px"
-                className="object-cover scale-105 blur-[1px] brightness-[0.75]"
+                sizes="(max-width: 640px) 45vw, 180px"
+                className="object-cover scale-105 brightness-[0.75]"
                 draggable={false}
               />
-              <div className="absolute inset-0 bg-black/30" />
+              <div className="absolute inset-0 bg-black/35" />
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-sm font-semibold text-white">
+                <span className="text-base font-semibold text-white">
                   +{moreCount}
                 </span>
               </div>
