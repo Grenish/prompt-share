@@ -9,6 +9,33 @@ export type UpdateProfileAvatarState = {
   error?: string | null;
 };
 
+// Helper: derive a storage object path (key) from a public URL for a given bucket
+function toStoragePath(
+  url: string | null | undefined,
+  bucketName: string
+): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    const parts = u.pathname.split("/").filter(Boolean);
+    // Typical path: /storage/v1/object/public/<bucket>/<key...>
+    const objectIdx = parts.findIndex((p) => p === "object");
+    if (objectIdx !== -1) {
+      const bucketIdx = objectIdx + 2; // object / public|sign|authenticated / <bucket>
+      const b = parts[bucketIdx];
+      if (b === bucketName) {
+        return decodeURIComponent(parts.slice(bucketIdx + 1).join("/"));
+      }
+    }
+    // Fallback: locate bucket directly in path
+    const bIdx = parts.findIndex((p) => p === bucketName);
+    if (bIdx !== -1) {
+      return decodeURIComponent(parts.slice(bIdx + 1).join("/"));
+    }
+  } catch {}
+  return null;
+}
+
 export async function updateProfileAvatar(
   _prevState: UpdateProfileAvatarState,
   formData: FormData
@@ -28,14 +55,46 @@ export async function updateProfileAvatar(
     const remove = formData.get("remove");
     const file = formData.get("avatar") as File | null;
 
+    // Get previous avatar URL (profiles preferred; fallback to auth metadata)
+    const { data: profRow } = await supabase
+      .from("profiles")
+      .select("avatar_url")
+      .eq("id", user.id)
+      .maybeSingle();
+    const oldAvatarUrl: string | null =
+      (profRow as any)?.avatar_url ?? (user as any)?.user_metadata?.avatar_url ?? null;
+
     // Handle remove avatar
     if (remove && (!file || (file as any).size === 0)) {
-      const { error } = await supabase.auth.updateUser({
+      const { error: authError } = await supabase.auth.updateUser({
         data: { avatar_url: null },
       });
-      if (error) return { ok: false, error: error.message };
-      // Revalidate layout so avatar updates everywhere
+      if (authError) return { ok: false, error: authError.message };
+
+      // Also sync profiles.avatar_url -> null
+      const { error: profileErr } = await supabase
+        .from("profiles")
+        .upsert({ id: user.id, avatar_url: null }, { onConflict: "id" });
+      if (profileErr) return { ok: false, error: profileErr.message };
+
+      // Best-effort: delete previous avatar file from storage
+      const oldObj = toStoragePath(oldAvatarUrl, "avatars");
+      if (oldObj) {
+        const { error: remErr } = await supabase.storage
+          .from("avatars")
+          .remove([oldObj]);
+        if (remErr) {
+          console.error("Failed to remove old avatar from storage", {
+            userId: user.id,
+            object: oldObj,
+            error: remErr,
+          });
+        }
+      }
+
+      // Revalidate layout and profile so avatar updates everywhere
       revalidatePath("/", "layout");
+      revalidatePath("/home/profile");
       return { ok: true, publicUrl: null };
     }
 
@@ -72,8 +131,32 @@ export async function updateProfileAvatar(
     });
     if (updateError) return { ok: false, error: updateError.message };
 
-    // Revalidate layout so avatar updates everywhere
+    // Also sync profiles.avatar_url -> publicUrl
+    const { error: upsertError } = await supabase
+      .from("profiles")
+      .upsert({ id: user.id, avatar_url: publicUrl }, { onConflict: "id" });
+    if (upsertError) return { ok: false, error: upsertError.message };
+
+    // Revalidate layout and profile so avatar updates everywhere
     revalidatePath("/", "layout");
+    revalidatePath("/home/profile");
+
+    // Best-effort: delete previous avatar after successful update
+    if (oldAvatarUrl && oldAvatarUrl !== publicUrl) {
+      const oldObj = toStoragePath(oldAvatarUrl, "avatars");
+      if (oldObj) {
+        const { error: remErr } = await supabase.storage
+          .from("avatars")
+          .remove([oldObj]);
+        if (remErr) {
+          console.error("Failed to remove old avatar from storage", {
+            userId: user.id,
+            object: oldObj,
+            error: remErr,
+          });
+        }
+      }
+    }
 
     return { ok: true, publicUrl };
   } catch (e: any) {
@@ -207,6 +290,14 @@ export async function updateProfileSettings(
   }
 
   try {
+    // Fetch previous background URL before changing
+    const { data: currentProfile } = await supabase
+      .from("profiles")
+      .select("background_image")
+      .eq("id", user.id)
+      .maybeSingle();
+    const oldBgUrl: string | null = (currentProfile as any)?.background_image ?? null;
+
     const bioRaw = formData.get("bio");
     const bio = typeof bioRaw === "string" ? bioRaw.trim() : null;
     const removeBackground = formData.get("removeBackground");
@@ -259,6 +350,26 @@ export async function updateProfileSettings(
 
     // Refresh the profile page
     revalidatePath("/home/profile");
+
+    // Best-effort: delete previous banner when removed or replaced
+    const bannerChanged =
+      (removeBackground && (!bgFile || (bgFile as any).size === 0)) ||
+      (bgFile && (bgFile as any).size > 0);
+    if (bannerChanged && oldBgUrl && oldBgUrl !== newBackgroundUrl) {
+      const oldObj = toStoragePath(oldBgUrl, "banners");
+      if (oldObj) {
+        const { error: remErr } = await supabase.storage
+          .from("banners")
+          .remove([oldObj]);
+        if (remErr) {
+          console.error("Failed to remove old banner from storage", {
+            userId: user.id,
+            object: oldObj,
+            error: remErr,
+          });
+        }
+      }
+    }
 
     return { ok: true, bio: bio ?? undefined, backgroundUrl: newBackgroundUrl };
   } catch (e: any) {
