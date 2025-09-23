@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { postAction } from "@/util/actions/postsActions";
+import { postAction, deletePosts } from "@/util/actions/postsActions";
 
 export async function POST(req: Request) {
   try {
@@ -33,6 +33,43 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: result.error }, { status: 400 });
     }
     return NextResponse.json({ ok: true, post: result.post });
+  } catch (e: any) {
+    return NextResponse.json(
+      { ok: false, error: e?.message || "Unexpected error" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    const contentType = req.headers.get("content-type") || "";
+    let postId: string | undefined;
+
+    if (contentType.includes("application/json")) {
+      const body = await req.json().catch(() => ({}));
+      if (body && typeof body.postId === "string") postId = body.postId;
+    } else {
+      const url = new URL(req.url);
+      const qp = url.searchParams.get("postId");
+      if (qp) postId = qp;
+    }
+
+    if (!postId) {
+      return NextResponse.json(
+        { ok: false, error: "Missing postId" },
+        { status: 400 }
+      );
+    }
+
+    const result = await deletePosts(postId);
+    if (!result.ok) {
+      return NextResponse.json(
+        { ok: false, error: result.error || "Failed to delete post" },
+        { status: 400 }
+      );
+    }
+    return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json(
       { ok: false, error: e?.message || "Unexpected error" },

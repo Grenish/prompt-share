@@ -17,6 +17,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import Image from "next/image";
+import { deletePosts } from "@/util/actions/postsActions";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
 
 /* ============================== Types =============================== */
 
@@ -797,14 +805,46 @@ export function PostItem({
                   {formatRelativeTime(post.createdAt)}
                 </time>
               </div>
-              <button
-                onClick={() => onMore?.(post)}
-                className="p-1 rounded hover:bg-muted shrink-0"
-                aria-label="More"
-                title="More"
-              >
-                <MoreHorizontal className="w-4 h-4" />
-              </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className="p-1 rounded hover:bg-muted shrink-0"
+                    aria-label="More"
+                    title="More"
+                  >
+                    <MoreHorizontal className="w-4 h-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-36">
+                  <DropdownMenuItem onClick={() => onMore?.(post)}>
+                    Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onClick={async () => {
+                      // Optimistic update: signal deletion
+                      onMore?.({
+                        ...post,
+                        meta: { ...(post.meta || {}), deleted: true },
+                      } as any);
+
+                      try {
+                        await deletePosts(post.id);
+                        toast.success("Post deleted successfully");
+                      } catch (e: any) {
+                        // Restore on failure
+                        onMore?.({
+                          ...post,
+                          meta: { ...(post.meta || {}), restore: true },
+                        } as any);
+                        toast.error(e?.message || "Could not delete post");
+                      }
+                    }}
+                  >
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
 
             {/* Meta badges */}
@@ -821,7 +861,7 @@ export function PostItem({
             {/* Text */}
             {post.text && (
               <div className="mt-2 whitespace-pre-wrap text-[15px] leading-6">
-                {(!expanded && post.text.length > 250)
+                {!expanded && post.text.length > 250
                   ? `${post.text.slice(0, 250)}…`
                   : post.text}
                 {!expanded && post.text.length > 250 && !open && (
@@ -944,6 +984,29 @@ export function PostFeed({
   loading,
   skeletonCount = 3,
 }: PostFeedProps) {
+  const [items, setItems] = React.useState(posts);
+
+  // Keep local items in sync when props.posts changes (e.g., navigation or refetch)
+  React.useEffect(() => {
+    setItems(posts);
+  }, [posts]);
+
+  // Internal handler to catch item-level signals (e.g., optimistic delete/restore)
+  const handleMore = React.useCallback(
+    (p: Post) => {
+      const meta: any = (p as any).meta || {};
+      if (meta.deleted) {
+        setItems((prev) => prev.filter((x) => x.id !== p.id));
+      } else if (meta.restore) {
+        setItems((prev) =>
+          prev.some((x) => x.id === p.id) ? prev : [p, ...prev]
+        );
+      }
+      onMore?.(p);
+    },
+    [onMore]
+  );
+
   return (
     <div className={cn("w-full", className)}>
       {loading
@@ -954,7 +1017,7 @@ export function PostFeed({
               showDivider={showDividers && i < skeletonCount - 1}
             />
           ))
-        : posts.map((post, i) => (
+        : items.map((post, i) => (
             <div key={post.id}>
               <PostItem
                 post={post}
@@ -963,13 +1026,13 @@ export function PostFeed({
                 onComment={onComment}
                 onShare={onShare}
                 onSave={onSave}
-                onMore={onMore}
+                onMore={handleMore}
                 onTagClick={onTagClick}
                 onUserClick={onUserClick}
                 fetchComments={fetchComments}
                 onSubmitComment={onSubmitComment}
               />
-              {showDividers && i < posts.length - 1 && (
+              {showDividers && i < items.length - 1 && (
                 <div className="border-b" />
               )}
             </div>

@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createClient } from "../supabase/server";
 
 export type PostActionInput = {
@@ -190,36 +191,82 @@ export async function postAction(
 
 export async function deletePosts(postId: string): Promise<PostActionResult> {
   const supabase = await createClient();
-
   const {
     data: { user },
     error: userError,
   } = await supabase.auth.getUser();
+  if (userError || !user) return { ok: false, error: "Not authenticated" };
 
-  if (userError || !user) {
-    return { ok: false, error: "Not authenticated" };
-  }
+  const bucket = "postsBucket";
 
-  // Check if the post exists and is owned by the user
   const { data: post, error: postError } = await supabase
     .from("posts")
-    .select("*")
+    .select("media_urls")
     .eq("id", postId)
     .eq("author", user.id)
     .single();
 
-  if (postError || !post) {
+  if (postError || !post)
     return { ok: false, error: postError?.message || "Post not found" };
+
+  const toStoragePath = (url: string, bucketName: string): string | null => {
+    try {
+      const u = new URL(url);
+      const parts = u.pathname.split("/").filter(Boolean);
+      const objectIdx = parts.findIndex((p) => p === "object");
+      if (objectIdx !== -1) {
+        const bucketIdx = objectIdx + 2;
+        if (parts[bucketIdx] === bucketName) {
+          return decodeURIComponent(parts.slice(bucketIdx + 1).join("/"));
+        }
+      }
+      const bIdx = parts.findIndex((p) => p === bucketName);
+      return bIdx !== -1
+        ? decodeURIComponent(parts.slice(bIdx + 1).join("/"))
+        : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const mediaUrls: string[] = Array.isArray((post as any).media_urls)
+    ? (post as any).media_urls
+    : [];
+  const objectNames = Array.from(
+    new Set(
+      mediaUrls
+        .filter((u): u is string => typeof u === "string" && u.length > 0)
+        .map((u) => toStoragePath(u, bucket))
+        .filter((p): p is string => Boolean(p))
+    )
+  );
+
+  if (objectNames.length > 0) {
+    const chunkSize = 100;
+    const chunks: string[][] = [];
+    for (let i = 0; i < objectNames.length; i += chunkSize) {
+      chunks.push(objectNames.slice(i, i + chunkSize));
+    }
+    const results = await Promise.all(
+      chunks.map((c) => supabase.storage.from(bucket).remove(c))
+    );
+    const removeError = results.find((r) => r.error)?.error;
+    if (removeError)
+      return {
+        ok: false,
+        error: `Failed to delete post media: ${removeError.message}`,
+      };
   }
 
-  // Delete the post
   const { error: deleteError } = await supabase
     .from("posts")
     .delete()
-    .eq("id", postId);
-  if (deleteError) {
-    return { ok: false, error: deleteError.message };
-  }
+    .eq("id", postId)
+    .eq("author", user.id);
+  if (deleteError) return { ok: false, error: deleteError.message };
+
+  revalidatePath("/", "layout");
+  revalidatePath("/home/profile");
 
   return { ok: true };
 }

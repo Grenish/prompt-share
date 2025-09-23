@@ -94,7 +94,7 @@ export default function UserCard({
 
   return (
     <Card
-      className="w-full max-w-md p-0 overflow-hidden rounded-xl border bg-card text-card-foreground shadow-sm transition-all duration-200 hover:shadow-md focus-within:shadow-md"
+      className="w-full max-w-sm p-0 overflow-hidden rounded-lg border bg-card text-card-foreground shadow-sm transition-all duration-200 hover:shadow-md focus-within:shadow-md"
       onClick={href ? () => router.push(href) : undefined}
       role={href ? "link" : undefined}
       tabIndex={href ? 0 : undefined}
@@ -112,7 +112,7 @@ export default function UserCard({
     >
       {/* Banner */}
       <CardHeader className="relative p-0 mb-0">
-        <div className="relative h-24 sm:h-32">
+        <div className="relative h-20 sm:h-24">
           {bannerUrl ? (
             <Image
               src={bannerUrl}
@@ -123,14 +123,14 @@ export default function UserCard({
               priority
             />
           ) : (
-            <div className="w-full h-32 bg-muted" />
+            <div className="w-full h-full bg-muted" />
           )}
 
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/0 via-black/10 to-black/40" />
         </div>
 
         {/* Avatar */}
-        <Avatar className="absolute -bottom-8 left-4 h-16 w-16 sm:h-20 sm:w-20 ring-4 ring-background shadow-md">
+        <Avatar className="absolute -bottom-7 left-3 h-14 w-14 sm:h-16 sm:w-16 ring-3 ring-background shadow-md">
           {avatarUrl ? (
             <AvatarImage src={avatarUrl} alt={name} />
           ) : (
@@ -142,18 +142,18 @@ export default function UserCard({
       </CardHeader>
 
       {/* Info */}
-      <CardContent className="pt-3 sm:pt-5 px-4 pb-4">
-        <div className="flex items-start justify-between gap-3">
+      <CardContent className="pt-2 sm:pt-4 px-3 pb-3">
+        <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-base sm:text-lg truncate">
+            <div className="flex items-center gap-1.5">
+              <span className="font-semibold text-sm sm:text-base truncate">
                 {name}
               </span>
             </div>
-            <span className="text-muted-foreground text-sm truncate">
+            <span className="text-muted-foreground text-xs sm:text-sm truncate">
               @{username}
             </span>
-            <div className="flex items-center gap-2 mt-2">
+            <div className="flex items-center gap-1.5 mt-1">
               <span className="font-base text-xs truncate">{bio}</span>
             </div>
           </div>
@@ -167,7 +167,7 @@ export default function UserCard({
             <Button
               type="submit"
               size="sm"
-              className="rounded-full px-3 sm:px-4"
+              className="rounded-full px-2.5 sm:px-3 text-xs sm:text-sm"
               disabled={actionPending || isFollowing === null}
             >
               {isFollowing ? "Unfollow" : "Follow"}
@@ -175,23 +175,23 @@ export default function UserCard({
           </form>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
-          <div className="flex items-center gap-1.5">
-            <Users className="h-4 w-4" aria-hidden />
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1">
+            <Users className="h-3.5 w-3.5" aria-hidden />
             <span className="font-medium text-foreground">
               {format(followersCount)}
             </span>
             <span className="hidden sm:inline">Followers</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <UserCheck className="h-4 w-4" aria-hidden />
+          <div className="flex items-center gap-1">
+            <UserCheck className="h-3.5 w-3.5" aria-hidden />
             <span className="font-medium text-foreground">
               {format(following)}
             </span>
             <span className="hidden sm:inline">Following</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <FileText className="h-4 w-4" aria-hidden />
+          <div className="flex items-center gap-1">
+            <FileText className="h-3.5 w-3.5" aria-hidden />
             <span className="font-medium text-foreground">
               {format(numPosts)}
             </span>
