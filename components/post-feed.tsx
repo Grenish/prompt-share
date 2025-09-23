@@ -830,7 +830,7 @@ export function PostItem({
 
                       try {
                         await deletePosts(post.id);
-                        toast.success("Post deleted successfully. It might take some time to reflect the changes in UI.");
+                        toast.success("Post deleted successfully");
                       } catch (e: any) {
                         // Restore on failure
                         onMore?.({
