@@ -1020,28 +1020,6 @@ function ImageCropper({
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="quality" className="text-sm">
-                Optimization Level
-              </Label>
-              <Select value={quality} onValueChange={setQuality}>
-                <SelectTrigger id="quality">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="high">
-                    High Quality (Larger file)
-                  </SelectItem>
-                  <SelectItem value="balanced">
-                    Balanced (Recommended)
-                  </SelectItem>
-                  <SelectItem value="optimized">
-                    Max Optimization (Smaller file)
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
             {previewStats && (
               <div className="space-y-2">
                 <Label className="text-sm">File Size</Label>
