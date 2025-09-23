@@ -5,6 +5,7 @@ import UserCard from "@/components/explore/user-card";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import { createClient } from "@/util/supabase/client";
+import HashTags from "@/components/explore/hashtags";
 
 type ProfileRow = {
   id: string;
@@ -13,6 +14,7 @@ type ProfileRow = {
   background_image: string | null;
   created_at?: string | null;
   // Optional fields that may exist in the profiles table
+  avatar_url?: string | null;
   display_name?: string | null;
 };
 
@@ -20,6 +22,7 @@ type UserResult = {
   id: string;
   username: string;
   displayName: string;
+  avatarUrl: string | undefined;
   bio: string | undefined;
   bannerUrl: string | undefined;
   followers: number;
@@ -74,7 +77,10 @@ export default function DashboardExplorePage() {
             ]);
 
             const displayName =
-              (p as any)?.display_name ?? (p as any)?.full_name ?? p.username ?? "unknown";
+              (p as any)?.full_name ??
+              (p as any)?.display_name ??
+              p.username ??
+              "unknown";
 
             return {
               id: p.id,
@@ -82,6 +88,7 @@ export default function DashboardExplorePage() {
               displayName,
               bio: p.bio ?? undefined,
               bannerUrl: p.background_image ?? undefined,
+              avatarUrl: p.avatar_url ?? undefined,
               followers: followersRes ?? 0,
               following: followingRes ?? 0,
               numPosts: postsRes ?? 0,
@@ -122,12 +129,13 @@ export default function DashboardExplorePage() {
       </header>
 
       <div className="pt-5 px-4 max-w-6xl mx-auto">
-        {error ? (
-          <p className="text-sm text-destructive">{error}</p>
-        ) : null}
+        <h2 className="text-xl font-semibold">You might know</h2>
+        {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
         {loading && results.length === 0 ? (
-          <div className="py-10 text-center text-sm text-muted-foreground">Searching…</div>
+          <div className="py-10 text-center text-sm text-muted-foreground">
+            Searching…
+          </div>
         ) : null}
 
         {!loading && results.length === 0 ? (
@@ -136,10 +144,11 @@ export default function DashboardExplorePage() {
           </div>
         ) : null}
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mt-5">
           {results.map((u) => (
             <UserCard
               key={u.id}
+              avatarUrl={u.avatarUrl}
               name={u.displayName}
               username={u.username}
               userId={u.id}
@@ -152,6 +161,20 @@ export default function DashboardExplorePage() {
             />
           ))}
         </div>
+      </div>
+
+      <div className="pt-5 px-4 max-w-6xl mx-auto">
+        <h2 className="text-xl font-semibold">Explore the tags</h2>
+        <HashTags
+          hashtag="nanobanana"
+          photos={[
+            "/img1.png",
+            "/img2.png",
+            "/img3.png",
+            "/img4.png",
+            "/img5.png",
+          ]}
+        />
       </div>
     </div>
   );
