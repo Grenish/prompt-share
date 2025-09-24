@@ -79,12 +79,15 @@ export type PostItemProps = {
   post: Post;
   dense?: boolean;
   className?: string;
+  // Optional current user's id to determine authorization for actions (e.g., Edit)
+  currentUserId?: string;
 
   onLike?: (post: Post, nextLiked: boolean) => void | Promise<void>;
   onComment?: (post: Post) => void;
   onShare?: (post: Post) => void;
   onSave?: (post: Post, nextSaved: boolean) => void | Promise<void>;
   onMore?: (post: Post) => void;
+  onReport?: (post: Post) => void;
   onTagClick?: (tag: string) => void;
   onUserClick?: (user: PostUser) => void;
 
@@ -97,12 +100,15 @@ export type PostFeedProps = {
   className?: string;
   dense?: boolean;
   showDividers?: boolean;
+  // Optional current user's id to determine authorization for actions (e.g., Edit)
+  currentUserId?: string;
 
   onLike?: PostItemProps["onLike"];
   onComment?: PostItemProps["onComment"];
   onShare?: PostItemProps["onShare"];
   onSave?: PostItemProps["onSave"];
   onMore?: PostItemProps["onMore"];
+  onReport?: PostItemProps["onReport"];
   onTagClick?: PostItemProps["onTagClick"];
   onUserClick?: PostItemProps["onUserClick"];
 
@@ -724,11 +730,13 @@ export function PostItem({
   post,
   dense,
   className,
+  currentUserId,
   onLike,
   onComment,
   onShare,
   onSave,
   onMore,
+  onReport,
   onTagClick,
   onUserClick,
   fetchComments,
@@ -816,33 +824,59 @@ export function PostItem({
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="min-w-36">
-                  <DropdownMenuItem onClick={() => onMore?.(post)}>
-                    Edit
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    variant="destructive"
-                    onClick={async () => {
-                      // Optimistic update: signal deletion
-                      onMore?.({
-                        ...post,
-                        meta: { ...(post.meta || {}), deleted: true },
-                      } as any);
+                  {currentUserId === post.user.id ? (
+                    <>
+                      {/* Author-only options. Server must still enforce authorization. */}
+                      <DropdownMenuItem onClick={() => onMore?.(post)}>
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onShare?.(post)}>
+                        Share
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        variant="destructive"
+                        onClick={async () => {
+                          // Optimistic update: signal deletion
+                          onMore?.({
+                            ...post,
+                            meta: { ...(post.meta || {}), deleted: true },
+                          } as any);
 
-                      try {
-                        await deletePosts(post.id);
-                        toast.success("Post deleted successfully");
-                      } catch (e: any) {
-                        // Restore on failure
-                        onMore?.({
-                          ...post,
-                          meta: { ...(post.meta || {}), restore: true },
-                        } as any);
-                        toast.error(e?.message || "Could not delete post");
-                      }
-                    }}
-                  >
-                    Delete
-                  </DropdownMenuItem>
+                          try {
+                            await deletePosts(post.id);
+                            toast.success("Post deleted successfully");
+                          } catch (e: any) {
+                            // Restore on failure
+                            onMore?.({
+                              ...post,
+                              meta: { ...(post.meta || {}), restore: true },
+                            } as any);
+                            toast.error(e?.message || "Could not delete post");
+                          }
+                        }}
+                      >
+                        Delete
+                      </DropdownMenuItem>
+                    </>
+                  ) : (
+                    <>
+                      {/* Non-author options */}
+                      <DropdownMenuItem onClick={() => onShare?.(post)}>
+                        Share
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          if (onReport) onReport(post);
+                          else
+                            toast.success(
+                              "Thanks, we’ve received your report."
+                            );
+                        }}
+                      >
+                        Report
+                      </DropdownMenuItem>
+                    </>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -972,11 +1006,13 @@ export function PostFeed({
   className,
   dense,
   showDividers = true,
+  currentUserId,
   onLike,
   onComment,
   onShare,
   onSave,
   onMore,
+  onReport,
   onTagClick,
   onUserClick,
   fetchComments,
@@ -1022,11 +1058,13 @@ export function PostFeed({
               <PostItem
                 post={post}
                 dense={dense}
+                currentUserId={currentUserId}
                 onLike={onLike}
                 onComment={onComment}
                 onShare={onShare}
                 onSave={onSave}
                 onMore={handleMore}
+                onReport={onReport}
                 onTagClick={onTagClick}
                 onUserClick={onUserClick}
                 fetchComments={fetchComments}
