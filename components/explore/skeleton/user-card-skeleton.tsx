@@ -31,7 +31,7 @@ export function UserCardSkeleton({
 
         {/* Avatar */}
         <div className="absolute -bottom-7 left-3">
-          <div className="h-14 w-14 sm:h-16 sm:w-16 rounded-full ring-3 ring-background shadow-md overflow-hidden">
+          <div className="h-14 w-14 sm:h-16 sm:w-16 rounded-full ring-[3px] ring-background shadow-md overflow-hidden">
             <Skeleton className="h-full w-full rounded-full" />
           </div>
         </div>
