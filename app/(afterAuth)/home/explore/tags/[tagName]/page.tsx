@@ -81,7 +81,7 @@ export default function TagPage() {
 
         const mapped: Post[] = (postRows || []).map((row: DbPost) => {
           const prof = profileMap.get(row.author);
-          const name = prof?.display_name || prof?.username || "User";
+          const name = prof?.full_name || prof?.username || "User";
           const attachments = (row.media_urls || []).map((u) => ({
             id: u,
             type: "image" as const,
