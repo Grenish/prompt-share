@@ -871,7 +871,10 @@ export function PostItem({
     });
 
     try {
-      await deletePosts(post.id);
+      const res = await deletePosts(post.id);
+      if (!res?.ok) {
+        throw new Error(res?.error || "Failed to delete post");
+      }
       toast.success("Post deleted successfully");
     } catch (e: any) {
       // Restore on failure
