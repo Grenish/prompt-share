@@ -7,6 +7,7 @@ import { Banana, Search } from "lucide-react";
 import { createClient } from "@/util/supabase/client";
 import HashTags from "@/components/explore/hashtags";
 import ModelCard from "@/components/explore/models-card";
+import { UserCardSkeleton } from "@/components/explore/skeleton/user-card-skeleton";
 
 type ProfileRow = {
   id: string;
@@ -14,7 +15,6 @@ type ProfileRow = {
   bio: string | null;
   background_image: string | null;
   created_at?: string | null;
-  // Optional fields that may exist in the profiles table
   avatar_url?: string | null;
   display_name?: string | null;
 };
@@ -38,6 +38,10 @@ export default function DashboardExplorePage() {
   const [results, setResults] = useState<UserResult[]>([]);
 
   const debouncedQuery = useDebounce(query, 350);
+  const isSearching = useMemo(
+    () => debouncedQuery.trim().length > 0,
+    [debouncedQuery]
+  );
 
   useEffect(() => {
     let active = true;
@@ -52,8 +56,7 @@ export default function DashboardExplorePage() {
         const like = `%${debouncedQuery.trim()}%`;
         let q = supabase
           .from("profiles")
-          // Select all to tolerate presence/absence of optional columns like display_name
-          .select("*");
+          .select("*"); // tolerate optional columns
 
         if (debouncedQuery.trim()) {
           q = q.or(`username.ilike.${like},bio.ilike.${like}`);
@@ -61,14 +64,14 @@ export default function DashboardExplorePage() {
 
         const { data: rows, error: qErr } = await q
           .order("created_at", { ascending: false })
-          .limit(10);
+          .limit(12);
         if (qErr) throw qErr;
 
         let profiles: ProfileRow[] = rows || [];
         // Filter out self
         if (selfId) profiles = profiles.filter((p) => p.id !== selfId);
 
-        // For each profile, fetch counts in parallel (N <= 10)
+        // For each profile, fetch counts in parallel (N <= 12)
         const enriched = await Promise.all(
           profiles.map(async (p) => {
             const [followersRes, followingRes, postsRes] = await Promise.all([
@@ -115,8 +118,9 @@ export default function DashboardExplorePage() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Sticky top search */}
       <header className="sticky top-0 z-30 border-b bg-background/80 backdrop-blur-sm">
-        <div className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8 h-16 flex items-center">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 h-16 flex items-center">
           <div className="relative w-full max-w-lg border rounded-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
@@ -129,96 +133,119 @@ export default function DashboardExplorePage() {
         </div>
       </header>
 
-      <div className="pt-5 px-4 max-w-6xl mx-auto">
-        <h2 className="text-xl font-semibold">You might know</h2>
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-5">
+          <main className="lg:col-span-8">
+            {isSearching ? (
+              <section>
+                <h2 className="text-xl font-semibold">People</h2>
+                {error ? (
+                  <p className="mt-2 text-sm text-destructive">{error}</p>
+                ) : null}
 
-        {loading && results.length === 0 ? (
-          <div className="py-10 text-center text-sm text-muted-foreground">
-            Searching…
-          </div>
-        ) : null}
+                {loading && results.length === 0 ? (
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mt-5">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <UserCardSkeleton key={i} />
+                    ))}
+                  </div>
+                ) : null}
 
-        {!loading && results.length === 0 ? (
-          <div className="py-10 text-center text-sm text-muted-foreground">
-            {debouncedQuery ? "No users found" : "Start typing to find people"}
-          </div>
-        ) : null}
+                {!loading && results.length === 0 ? (
+                  <div className="py-10 text-center text-sm text-muted-foreground">
+                    No users found{debouncedQuery ? ` for “${debouncedQuery}”` : ""}
+                  </div>
+                ) : null}
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mt-5">
-          {results.map((u) => (
-            <UserCard
-              key={u.id}
-              avatarUrl={u.avatarUrl}
-              name={u.displayName}
-              username={u.username}
-              userId={u.id}
-              bio={u.bio}
-              bannerUrl={u.bannerUrl}
-              followers={u.followers}
-              following={u.following}
-              numPosts={u.numPosts}
-              href={u.username ? `/home/profile/${u.username}` : undefined}
-            />
-          ))}
-        </div>
-      </div>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mt-5">
+                  {results.map((u) => (
+                    <UserCard
+                      key={u.id}
+                      avatarUrl={u.avatarUrl}
+                      name={u.displayName}
+                      username={u.username}
+                      userId={u.id}
+                      bio={u.bio}
+                      bannerUrl={u.bannerUrl}
+                      followers={u.followers}
+                      following={u.following}
+                      numPosts={u.numPosts}
+                      href={u.username ? `/home/profile/${u.username}` : undefined}
+                    />
+                  ))}
+                </div>
+              </section>
+            ) : (
+              <>
+                <section>
+                  <h2 className="text-xl font-semibold mb-5">Explore by tags</h2>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mt-5">
+                    <HashTags
+                      hashtag="cinematic"
+                      photos={["/img1.png", "/img2.png", "/img3.png", "/img4.png", "/img5.png"]}
+                    />
+                    <HashTags
+                      hashtag="creative"
+                      photos={["/img1.png", "/img2.png", "/img3.png", "/img4.png", "/img5.png"]}
+                    />
+                    <HashTags
+                      hashtag="anime"
+                      photos={["/img1.png", "/img2.png", "/img3.png", "/img4.png", "/img5.png"]}
+                    />
+                  </div>
+                </section>
 
-      <div className="pt-5 px-4 max-w-6xl mx-auto">
-        <h2 className="text-xl font-semibold mb-5">Explore by tags</h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mt-5">
-          <HashTags
-            hashtag="cinematic"
-            photos={[
-              "/img1.png",
-              "/img2.png",
-              "/img3.png",
-              "/img4.png",
-              "/img5.png",
-            ]}
-          />
-          <HashTags
-            hashtag="creative"
-            photos={[
-              "/img1.png",
-              "/img2.png",
-              "/img3.png",
-              "/img4.png",
-              "/img5.png",
-            ]}
-          />
-          <HashTags
-            hashtag="anime"
-            photos={[
-              "/img1.png",
-              "/img2.png",
-              "/img3.png",
-              "/img4.png",
-              "/img5.png",
-            ]}
-          />
-        </div>
-      </div>
-      <div className="pt-5 px-4 max-w-6xl mx-auto">
-        <h2 className="text-xl font-semibold mb-5">Explore by models</h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mt-5">
-          <ModelCard
-            model="gemini"
-            modelName="Nano Banana"
-            icon={<Banana className="ml-2 h-5 w-5 text-yellow-500" />}
-          />
-          <ModelCard
-            model="chatgpt"
-            modelName="Image"
-          />
-          <ModelCard
-            model="grok"
-            modelName="Imagine"
-          />
-          <ModelCard
-            model="midjourney"
-            modelName="Midjourney"
-          />
+                <section className="mt-8">
+                  <h2 className="text-xl font-semibold mb-5">Explore by models</h2>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mt-5">
+                    <ModelCard
+                      model="gemini"
+                      modelName="Nano Banana"
+                      icon={<Banana className="ml-2 h-5 w-5 text-yellow-500" />}
+                    />
+                    <ModelCard model="chatgpt" modelName="Image" />
+                    <ModelCard model="grok" modelName="Imagine" />
+                    <ModelCard model="midjourney" modelName="Midjourney" />
+                  </div>
+                </section>
+              </>
+            )}
+          </main>
+
+          {!isSearching && (
+            <aside className="lg:col-span-4 lg:sticky lg:top-16 h-fit">
+              <h2 className="text-xl font-semibold">Who to follow</h2>
+              {error ? (
+                <p className="mt-2 text-sm text-destructive">{error}</p>
+              ) : null}
+
+              {loading && results.length === 0 ? (
+                <div className="mt-4 space-y-4">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <UserCardSkeleton key={i} />
+                  ))}
+                </div>
+              ) : null}
+
+              <div className="mt-4 space-y-4">
+                {results.slice(0, 6).map((u) => (
+                  <UserCard
+                    key={u.id}
+                    avatarUrl={u.avatarUrl}
+                    name={u.displayName}
+                    username={u.username}
+                    userId={u.id}
+                    bio={u.bio}
+                    bannerUrl={u.bannerUrl}
+                    followers={u.followers}
+                    following={u.following}
+                    numPosts={u.numPosts}
+                    href={u.username ? `/home/profile/${u.username}` : undefined}
+                  />
+                ))}
+              </div>
+            </aside>
+          )}
         </div>
       </div>
     </div>
