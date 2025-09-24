@@ -10,7 +10,7 @@ import {
 import { createClient } from "@/util/supabase/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import BackButton from "@/components/back-button";
+import { BackButton } from "@/components/back-button";
 
 export default async function ExploreModelPage({
   params,
