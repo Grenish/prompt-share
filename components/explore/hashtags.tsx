@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { Card, CardContent, CardHeader } from "../ui/card";
 
 type HashTagsProps = {
@@ -18,14 +19,16 @@ export default function HashTags({
   // If more than 4 photos: show first 3 + "+X" tile using the 4th photo as background.
   const tiles = showMore ? photos.slice(0, 3) : photos.slice(0, 4);
 
+  const href = `/home/explore/tags/${encodeURIComponent(hashtag)}`;
+
   return (
-    <Card
-      className={[
-        "w-full max-w-sm h-[350px] flex flex-col overflow-hidden rounded-xl border bg-card shadow-sm p-2 gap-0",
-        className || "",
-      ].join(" ")}
-    >
-      {/* Minimal header for a single hashtag */}
+    <Link href={href} className="block">
+      <Card
+        className={[
+          "w-full max-w-sm h-[350px] flex flex-col overflow-hidden rounded-xl border bg-card shadow-sm p-2 gap-0",
+          className || "",
+        ].join(" ")}
+      >
       <CardHeader className="pt-1 px-0 mb-1">
         <span className="inline-flex w-fit text-xl items-center rounded-full px-2 py-0.5 font-medium text-muted-foreground leading-none">
           #{hashtag}
@@ -70,6 +73,7 @@ export default function HashTags({
           )}
         </div>
       </CardContent>
-    </Card>
+      </Card>
+    </Link>
   );
 }
