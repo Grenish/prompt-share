@@ -2,45 +2,23 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "../supabase/server";
+import { toStoragePath } from "@/util/storage/helpers";
 
 export type UpdateProfileAvatarState = {
   ok: boolean;
   publicUrl?: string | null;
   error?: string | null;
+  warnings?: string[];
 };
 
-// Helper: derive a storage object path (key) from a public URL for a given bucket
-function toStoragePath(
-  url: string | null | undefined,
-  bucketName: string
-): string | null {
-  if (!url) return null;
-  try {
-    const u = new URL(url);
-    const parts = u.pathname.split("/").filter(Boolean);
-    // Typical path: /storage/v1/object/public/<bucket>/<key...>
-    const objectIdx = parts.findIndex((p) => p === "object");
-    if (objectIdx !== -1) {
-      const bucketIdx = objectIdx + 2; // object / public|sign|authenticated / <bucket>
-      const b = parts[bucketIdx];
-      if (b === bucketName) {
-        return decodeURIComponent(parts.slice(bucketIdx + 1).join("/"));
-      }
-    }
-    // Fallback: locate bucket directly in path
-    const bIdx = parts.findIndex((p) => p === bucketName);
-    if (bIdx !== -1) {
-      return decodeURIComponent(parts.slice(bIdx + 1).join("/"));
-    }
-  } catch {}
-  return null;
-}
+// Helper moved to util/storage/helpers.ts
 
 export async function updateProfileAvatar(
   _prevState: UpdateProfileAvatarState,
   formData: FormData
 ): Promise<UpdateProfileAvatarState> {
   const supabase = await createClient();
+  const warnings: string[] = [];
 
   const {
     data: { user },
@@ -80,22 +58,48 @@ export async function updateProfileAvatar(
       // Best-effort: delete previous avatar file from storage
       const oldObj = toStoragePath(oldAvatarUrl, "avatars");
       if (oldObj) {
-        const { error: remErr } = await supabase.storage
-          .from("avatars")
-          .remove([oldObj]);
+        // Best-effort retry once
+        let remErr: any | null = null;
+        const attempt = async () =>
+          supabase.storage.from("avatars").remove([oldObj]);
+        let res = await attempt();
+        if (res.error) {
+          // retry once
+          res = await attempt();
+          if (res.error) remErr = res.error;
+        }
         if (remErr) {
           console.error("Failed to remove old avatar from storage", {
             userId: user.id,
             object: oldObj,
             error: remErr,
           });
+          // telemetry + enqueue non-blocking
+          const { recordCleanupFailure, incrementCleanupMetric, enqueueCleanupTask } = await import(
+            "@/util/monitoring/cleanup"
+          );
+          incrementCleanupMetric({ bucket: "avatars", context: "avatar-remove" });
+          recordCleanupFailure({
+            userId: user.id,
+            bucket: "avatars",
+            object: oldObj,
+            error: remErr.message || String(remErr),
+            context: "avatar-remove",
+          });
+          enqueueCleanupTask({
+            bucket: "avatars",
+            object: oldObj,
+            reason: "post-remove-avatar-cleanup",
+            attempts: 0,
+          });
+          warnings.push("Old avatar file could not be deleted; cleanup enqueued");
         }
       }
 
       // Revalidate layout and profile so avatar updates everywhere
-      revalidatePath("/", "layout");
-      revalidatePath("/home/profile");
-      return { ok: true, publicUrl: null };
+  revalidatePath("/", "layout");
+  revalidatePath("/home/profile");
+  return { ok: true, publicUrl: null, warnings: warnings.length ? warnings : undefined };
     }
 
     if (!file || (file as any).size === 0) {
@@ -145,20 +149,44 @@ export async function updateProfileAvatar(
     if (oldAvatarUrl && oldAvatarUrl !== publicUrl) {
       const oldObj = toStoragePath(oldAvatarUrl, "avatars");
       if (oldObj) {
-        const { error: remErr } = await supabase.storage
-          .from("avatars")
-          .remove([oldObj]);
+        // Best-effort retry once
+        let remErr: any | null = null;
+        const attempt = async () =>
+          supabase.storage.from("avatars").remove([oldObj]);
+        let res = await attempt();
+        if (res.error) {
+          res = await attempt();
+          if (res.error) remErr = res.error;
+        }
         if (remErr) {
           console.error("Failed to remove old avatar from storage", {
             userId: user.id,
             object: oldObj,
             error: remErr,
           });
+          const { recordCleanupFailure, incrementCleanupMetric, enqueueCleanupTask } = await import(
+            "@/util/monitoring/cleanup"
+          );
+          incrementCleanupMetric({ bucket: "avatars", context: "avatar-replace" });
+          recordCleanupFailure({
+            userId: user.id,
+            bucket: "avatars",
+            object: oldObj,
+            error: remErr.message || String(remErr),
+            context: "avatar-replace",
+          });
+          enqueueCleanupTask({
+            bucket: "avatars",
+            object: oldObj,
+            reason: "post-update-avatar-cleanup",
+            attempts: 0,
+          });
+          warnings.push("Previous avatar file could not be deleted; cleanup enqueued");
         }
       }
     }
 
-    return { ok: true, publicUrl };
+    return { ok: true, publicUrl, warnings: warnings.length ? warnings : undefined };
   } catch (e: any) {
     return { ok: false, error: e?.message || "Unknown error" };
   }
@@ -266,6 +294,7 @@ export type UpdateProfileSettingsState = {
   error?: string | null;
   backgroundUrl?: string | null;
   bio?: string | null;
+  warnings?: string[];
 };
 
 /**
@@ -280,6 +309,7 @@ export async function updateProfileSettings(
   formData: FormData
 ): Promise<UpdateProfileSettingsState> {
   const supabase = await createClient();
+  const warnings: string[] = [];
 
   const {
     data: { user },
@@ -358,20 +388,49 @@ export async function updateProfileSettings(
     if (bannerChanged && oldBgUrl && oldBgUrl !== newBackgroundUrl) {
       const oldObj = toStoragePath(oldBgUrl, "banners");
       if (oldObj) {
-        const { error: remErr } = await supabase.storage
-          .from("banners")
-          .remove([oldObj]);
+        // Best-effort retry once
+        let remErr: any | null = null;
+        const attempt = async () =>
+          supabase.storage.from("banners").remove([oldObj]);
+        let res = await attempt();
+        if (res.error) {
+          res = await attempt();
+          if (res.error) remErr = res.error;
+        }
         if (remErr) {
           console.error("Failed to remove old banner from storage", {
             userId: user.id,
             object: oldObj,
             error: remErr,
           });
+          const { recordCleanupFailure, incrementCleanupMetric, enqueueCleanupTask } = await import(
+            "@/util/monitoring/cleanup"
+          );
+          incrementCleanupMetric({ bucket: "banners", context: "banner-remove" });
+          recordCleanupFailure({
+            userId: user.id,
+            bucket: "banners",
+            object: oldObj,
+            error: remErr.message || String(remErr),
+            context: "banner-remove",
+          });
+          enqueueCleanupTask({
+            bucket: "banners",
+            object: oldObj,
+            reason: "post-update-banner-cleanup",
+            attempts: 0,
+          });
+          warnings.push("Previous banner file could not be deleted; cleanup enqueued");
         }
       }
     }
 
-    return { ok: true, bio: bio ?? undefined, backgroundUrl: newBackgroundUrl };
+    return {
+      ok: true,
+      bio: bio ?? undefined,
+      backgroundUrl: newBackgroundUrl,
+      warnings: warnings.length ? warnings : undefined,
+    };
   } catch (e: any) {
     return { ok: false, error: e?.message || "Unknown error" };
   }

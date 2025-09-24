@@ -25,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+import { createClient as createSupabaseClient } from "@/util/supabase/client";
 
 /* ============================== Types =============================== */
 
@@ -64,6 +65,14 @@ export type Post = {
     model?: string;
     category?: string;
     subCategory?: string;
+    // internal UI flags used by onMore in this file
+    deleted?: boolean;
+    restore?: boolean;
+    hidden?: boolean;
+    notInterested?: boolean;
+    muteUserId?: string;
+    blockUserId?: string;
+    reported?: boolean;
   };
   stats?: {
     likes: number;
@@ -79,6 +88,8 @@ export type PostItemProps = {
   post: Post;
   dense?: boolean;
   className?: string;
+  // Optional current user's id to determine authorization for actions (e.g., Edit)
+  currentUserId?: string;
 
   onLike?: (post: Post, nextLiked: boolean) => void | Promise<void>;
   onComment?: (post: Post) => void;
@@ -97,6 +108,8 @@ export type PostFeedProps = {
   className?: string;
   dense?: boolean;
   showDividers?: boolean;
+  // Optional current user's id to determine authorization for actions (e.g., Edit)
+  currentUserId?: string;
 
   onLike?: PostItemProps["onLike"];
   onComment?: PostItemProps["onComment"];
@@ -481,7 +494,6 @@ function PostDetailDialog({
           {attachments.length > 0 ? (
             <>
               {attachments[mediaIndex].type === "image" ? (
-                // eslint-disable-next-line @next/next/no-img-element
                 <Image
                   fill
                   src={attachments[mediaIndex].url}
@@ -724,6 +736,7 @@ export function PostItem({
   post,
   dense,
   className,
+  currentUserId,
   onLike,
   onComment,
   onShare,
@@ -772,6 +785,104 @@ export function PostItem({
     }
   };
 
+  // Contextual menu helpers
+  const isAuthor = currentUserId === post.user.id;
+
+  const postUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/posts/${post.id}`
+      : `/posts/${post.id}`;
+
+  const handleShareMenu = async () => {
+    try {
+      setStats((s) => ({ ...s, shares: s.shares + 1 }));
+      if (navigator?.share) {
+        await navigator.share({
+          title: `${post.user.name} on Social`,
+          text: post.text?.slice(0, 140),
+          url: postUrl,
+        });
+      } else if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(postUrl);
+        toast.success("Link copied to clipboard");
+      }
+      onShare?.(post);
+    } catch {
+      // ignore (user cancelled)
+    }
+  };
+
+  const handleCopyLink = async () => {
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(postUrl);
+        toast.success("Link copied to clipboard");
+      } else {
+        toast.error("Clipboard is not available");
+      }
+    } catch {
+      toast.error("Could not copy link");
+    }
+  };
+
+  const handleReportMenu = () => {
+    onMore?.({
+      ...post,
+      meta: { ...(post.meta || {}), reported: true },
+    });
+    toast.success("Thanks for your report. Our team will review it.");
+  };
+
+  const handleNotInterestedMenu = () => {
+    onMore?.({
+      ...post,
+      meta: { ...(post.meta || {}), hidden: true, notInterested: true },
+    });
+    toast("We'll show you fewer posts like this");
+  };
+
+  const handleMuteMenu = () => {
+    onMore?.({
+      ...post,
+      meta: { ...(post.meta || {}), muteUserId: post.user.id },
+    });
+    toast(
+      `Muted ${post.user.username ? `@${post.user.username}` : post.user.name}`
+    );
+  };
+
+  const handleBlockMenu = () => {
+    onMore?.({
+      ...post,
+      meta: { ...(post.meta || {}), blockUserId: post.user.id },
+    });
+    toast.success(
+      `Blocked ${
+        post.user.username ? `@${post.user.username}` : post.user.name
+      }`
+    );
+  };
+
+  const handleDeleteMenu = async () => {
+    // Optimistic remove
+    onMore?.({
+      ...post,
+      meta: { ...(post.meta || {}), deleted: true },
+    });
+
+    try {
+      await deletePosts(post.id);
+      toast.success("Post deleted successfully");
+    } catch (e: any) {
+      // Restore on failure
+      onMore?.({
+        ...post,
+        meta: { ...(post.meta || {}), restore: true },
+      });
+      toast.error(e?.message || "Could not delete post");
+    }
+  };
+
   return (
     <>
       <article className={cn("w-full", dense ? "py-4" : "py-6", className)}>
@@ -805,6 +916,7 @@ export function PostItem({
                   {formatRelativeTime(post.createdAt)}
                 </time>
               </div>
+
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
@@ -815,34 +927,57 @@ export function PostItem({
                     <MoreHorizontal className="w-4 h-4" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="min-w-36">
-                  <DropdownMenuItem onClick={() => onMore?.(post)}>
-                    Edit
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    variant="destructive"
-                    onClick={async () => {
-                      // Optimistic update: signal deletion
-                      onMore?.({
-                        ...post,
-                        meta: { ...(post.meta || {}), deleted: true },
-                      } as any);
 
-                      try {
-                        await deletePosts(post.id);
-                        toast.success("Post deleted successfully");
-                      } catch (e: any) {
-                        // Restore on failure
-                        onMore?.({
-                          ...post,
-                          meta: { ...(post.meta || {}), restore: true },
-                        } as any);
-                        toast.error(e?.message || "Could not delete post");
-                      }
-                    }}
-                  >
-                    Delete
-                  </DropdownMenuItem>
+                <DropdownMenuContent align="end" className="min-w-44">
+                  {isAuthor ? (
+                    <>
+                      <DropdownMenuItem onClick={() => onMore?.(post)}>
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleShareMenu}>
+                        Share
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        variant="destructive"
+                        onClick={handleDeleteMenu}
+                      >
+                        Delete
+                      </DropdownMenuItem>
+                    </>
+                  ) : (
+                    <>
+                      <DropdownMenuItem onClick={handleShareMenu}>
+                        Share
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleCopyLink}>
+                        Copy link
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleNotInterestedMenu}>
+                        Not interested
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleMuteMenu}>
+                        Mute{" "}
+                        {post.user.username
+                          ? `@${post.user.username}`
+                          : post.user.name}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        variant="destructive"
+                        onClick={handleBlockMenu}
+                      >
+                        Block{" "}
+                        {post.user.username
+                          ? `@${post.user.username}`
+                          : post.user.name}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        variant="destructive"
+                        onClick={handleReportMenu}
+                      >
+                        Report
+                      </DropdownMenuItem>
+                    </>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -972,6 +1107,7 @@ export function PostFeed({
   className,
   dense,
   showDividers = true,
+  currentUserId,
   onLike,
   onComment,
   onShare,
@@ -985,6 +1121,34 @@ export function PostFeed({
   skeletonCount = 3,
 }: PostFeedProps) {
   const [items, setItems] = React.useState(posts);
+  // Determine viewer (current) user id if not provided via props
+  const [viewerId, setViewerId] = React.useState<string | undefined>(
+    currentUserId
+  );
+
+  // Keep internal viewerId in sync with prop if parent provides/changes it
+  React.useEffect(() => {
+    setViewerId(currentUserId);
+  }, [currentUserId]);
+
+  // If not provided, fetch from Supabase client on the browser
+  React.useEffect(() => {
+    let cancelled = false;
+    if (viewerId == null) {
+      const supabase = createSupabaseClient();
+      supabase.auth
+        .getUser()
+        .then(({ data: { user } }) => {
+          if (!cancelled) setViewerId(user?.id);
+        })
+        .catch(() => {
+          if (!cancelled) setViewerId(undefined);
+        });
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [viewerId]);
 
   // Keep local items in sync when props.posts changes (e.g., navigation or refetch)
   React.useEffect(() => {
@@ -995,12 +1159,17 @@ export function PostFeed({
   const handleMore = React.useCallback(
     (p: Post) => {
       const meta: any = (p as any).meta || {};
-      if (meta.deleted) {
+      if (meta.deleted || meta.hidden || meta.notInterested) {
         setItems((prev) => prev.filter((x) => x.id !== p.id));
       } else if (meta.restore) {
         setItems((prev) =>
           prev.some((x) => x.id === p.id) ? prev : [p, ...prev]
         );
+      }
+
+      if (meta.muteUserId || meta.blockUserId) {
+        const userId = meta.muteUserId || meta.blockUserId;
+        setItems((prev) => prev.filter((x) => x.user.id !== userId));
       }
       onMore?.(p);
     },
@@ -1022,6 +1191,7 @@ export function PostFeed({
               <PostItem
                 post={post}
                 dense={dense}
+                currentUserId={viewerId}
                 onLike={onLike}
                 onComment={onComment}
                 onShare={onShare}
