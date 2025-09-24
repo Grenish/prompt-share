@@ -1257,5 +1257,6 @@
   --background-image-chatgpt: url('/models/chatgpt.png');
   --background-image-grok: url('/models/grok.png');
   --background-image-midjourney: url('/models/midjourney.png');
+  --background-image-other: url('/models/other.png');
 
 }
