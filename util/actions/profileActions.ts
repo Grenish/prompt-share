@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "../supabase/server";
+import { toStoragePath } from "@/util/storage/helpers";
 
 export type UpdateProfileAvatarState = {
   ok: boolean;
@@ -9,32 +10,7 @@ export type UpdateProfileAvatarState = {
   error?: string | null;
 };
 
-// Helper: derive a storage object path (key) from a public URL for a given bucket
-function toStoragePath(
-  url: string | null | undefined,
-  bucketName: string
-): string | null {
-  if (!url) return null;
-  try {
-    const u = new URL(url);
-    const parts = u.pathname.split("/").filter(Boolean);
-    // Typical path: /storage/v1/object/public/<bucket>/<key...>
-    const objectIdx = parts.findIndex((p) => p === "object");
-    if (objectIdx !== -1) {
-      const bucketIdx = objectIdx + 2; // object / public|sign|authenticated / <bucket>
-      const b = parts[bucketIdx];
-      if (b === bucketName) {
-        return decodeURIComponent(parts.slice(bucketIdx + 1).join("/"));
-      }
-    }
-    // Fallback: locate bucket directly in path
-    const bIdx = parts.findIndex((p) => p === bucketName);
-    if (bIdx !== -1) {
-      return decodeURIComponent(parts.slice(bIdx + 1).join("/"));
-    }
-  } catch {}
-  return null;
-}
+// Helper moved to util/storage/helpers.ts
 
 export async function updateProfileAvatar(
   _prevState: UpdateProfileAvatarState,

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "../supabase/server";
+import { toStoragePath } from "@/util/storage/helpers";
 
 export type PostActionInput = {
   text: string;
@@ -209,25 +210,7 @@ export async function deletePosts(postId: string): Promise<PostActionResult> {
   if (postError || !post)
     return { ok: false, error: postError?.message || "Post not found" };
 
-  const toStoragePath = (url: string, bucketName: string): string | null => {
-    try {
-      const u = new URL(url);
-      const parts = u.pathname.split("/").filter(Boolean);
-      const objectIdx = parts.findIndex((p) => p === "object");
-      if (objectIdx !== -1) {
-        const bucketIdx = objectIdx + 2;
-        if (parts[bucketIdx] === bucketName) {
-          return decodeURIComponent(parts.slice(bucketIdx + 1).join("/"));
-        }
-      }
-      const bIdx = parts.findIndex((p) => p === bucketName);
-      return bIdx !== -1
-        ? decodeURIComponent(parts.slice(bIdx + 1).join("/"))
-        : null;
-    } catch {
-      return null;
-    }
-  };
+  // toStoragePath imported from shared util/storage/helpers
 
   const mediaUrls: string[] = Array.isArray((post as any).media_urls)
     ? (post as any).media_urls
