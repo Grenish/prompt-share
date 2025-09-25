@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   Send,
   X,
+  ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,6 +27,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { createClient as createSupabaseClient } from "@/util/supabase/client";
+import { useRouter } from "next/navigation";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
+import { Arrow } from "@radix-ui/react-tooltip";
 
 /* ============================== Types =============================== */
 
@@ -45,6 +53,10 @@ export type PostUser = {
   username?: string;
   avatarUrl?: string;
   verified?: boolean;
+  bio?: string;
+  postsCount?: number;
+  followersCount?: number;
+  followingCount?: number;
 };
 
 export type PostComment = {
@@ -155,8 +167,6 @@ function numberCompact(n: number | undefined) {
   return Intl.NumberFormat(undefined, { notation: "compact" }).format(n);
 }
 
-/* ============================ Small UI ============================== */
-
 function Avatar({
   user,
   size = 40,
@@ -174,7 +184,6 @@ function Avatar({
       aria-label={`${user.name}'s profile`}
     >
       {user.avatarUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={user.avatarUrl}
           alt={user.name}
@@ -210,8 +219,6 @@ function MetaBadge({ label }: { label?: string }) {
     </span>
   );
 }
-
-/* -------------------------- Media Grid + Open --------------------------- */
 
 function PostMediaGrid({
   items = [],
@@ -351,11 +358,8 @@ function MediaThumb({
       />
     );
   }
-  // eslint-disable-next-line @next/next/no-img-element
   return <img src={media.url} alt={media.alt ?? ""} className={imgCls} />;
 }
-
-/* ----------------------------- Detail Dialog ----------------------------- */
 
 function PostDetailDialog({
   post,
@@ -405,7 +409,6 @@ function PostDetailDialog({
     }
   }, [open, comments, fetchComments, post]);
 
-  // Lock body scroll when open
   React.useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
@@ -415,7 +418,6 @@ function PostDetailDialog({
     };
   }, [open]);
 
-  // Keyboard navigation
   React.useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -559,9 +561,7 @@ function PostDetailDialog({
           )}
         </div>
 
-        {/* Right: Details */}
         <div className="w-[420px] flex flex-col bg-card border-l">
-          {/* Header */}
           <div className="p-6 border-b flex items-start justify-between">
             <div className="flex items-start gap-3">
               <Avatar user={post.user} size={42} />
@@ -730,8 +730,6 @@ function PostDetailDialog({
   );
 }
 
-/* ------------------------------ Post Item ------------------------------ */
-
 export function PostItem({
   post,
   dense,
@@ -747,6 +745,7 @@ export function PostItem({
   fetchComments,
   onSubmitComment,
 }: PostItemProps) {
+  const router = useRouter();
   const [liked, setLiked] = React.useState(Boolean(post.liked));
   const [saved, setSaved] = React.useState(Boolean(post.saved));
   const [stats, setStats] = React.useState(
@@ -785,7 +784,6 @@ export function PostItem({
     }
   };
 
-  // Contextual menu helpers
   const isAuthor = currentUserId === post.user.id;
 
   const postUrl =
@@ -807,9 +805,7 @@ export function PostItem({
         toast.success("Link copied to clipboard");
       }
       onShare?.(post);
-    } catch {
-      // ignore (user cancelled)
-    }
+    } catch {}
   };
 
   const handleCopyLink = async () => {
@@ -864,7 +860,6 @@ export function PostItem({
   };
 
   const handleDeleteMenu = async () => {
-    // Optimistic remove
     onMore?.({
       ...post,
       meta: { ...(post.meta || {}), deleted: true },
@@ -896,13 +891,78 @@ export function PostItem({
             {/* Header */}
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-2 text-sm flex-wrap min-w-0">
-                <button
-                  onClick={() => onUserClick?.(post.user)}
-                  className="font-medium hover:underline"
-                  title={post.user.name}
-                >
-                  {post.user.name}
-                </button>
+                <HoverCard openDelay={150} closeDelay={100}>
+                  <HoverCardTrigger asChild>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onUserClick?.(post.user);
+                      }}
+                      className="group relative font-medium text-foreground transition-colors duration-200 hover:text-primary hover:underline focus:outline-none"
+                      aria-label={`View profile of ${post.user.name}`}
+                    >
+                      {post.user.name}
+                    </button>
+                  </HoverCardTrigger>
+
+                  <HoverCardContent
+                    className="w-80 p-0 overflow-hidden border border-border/60 backdrop-blur-md bg-card/95 shadow-xl rounded-xl animate-in fade-in-50 zoom-in-95"
+                    sideOffset={8}
+                    align="start"
+                  >
+                    {/* Gradient Header Accent */}
+                    <div className="h-1 bg-gradient-to-r from-primary/30 to-transparent" />
+
+                    <div className="p-4 space-y-3">
+                      {/* Avatar + Info Row */}
+                      <div className="flex items-start gap-3">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onUserClick?.(post.user);
+                          }}
+                          className="shrink-0 transition-transform hover:scale-105 active:scale-95"
+                          aria-label={`Visit ${post.user.name}'s profile`}
+                        >
+                          <Avatar user={post.user} size={42} />
+                        </button>
+
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-base font-semibold truncate leading-tight">
+                              {post.user.name}
+                            </h4>
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                              @{post.user.username}
+                            </span>
+                          </div>
+
+                          <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3 max-h-[4.5rem]">
+                            {post.user.bio || "No bio yet."}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between text-xs text-muted-foreground pt-2 border-t border-border/40">
+                        <span>Posts: {post.user.postsCount ?? 0}</span>
+                        <span>Followers: {post.user.followersCount ?? 0}</span>
+                        <span>Following: {post.user.followingCount ?? 0}</span>
+                      </div>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/home/profile/${post.user.username}`);
+                        }}
+                        className="w-full mt-1 py-2 text-sm font-medium text-primary hover:bg-primary/5 active:bg-primary/10 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
+                        aria-label={`Go to ${post.user.name}'s profile`}
+                      >
+                        <span>View Profile</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </HoverCardContent>
+                </HoverCard>
                 {post.user.verified && (
                   <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
                 )}
@@ -1102,8 +1162,6 @@ export function PostItem({
     </>
   );
 }
-
-/* ------------------------------ Post Feed ------------------------------ */
 
 export function PostFeed({
   posts,
