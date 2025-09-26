@@ -101,11 +101,17 @@ export default async function DashboardHomePage() {
       },
       createdAt: row.created_at || new Date().toISOString(),
       text: row.text || undefined,
-      attachments: mediaUrls.map((url) => ({
-        id: url,
-        type: "image" as const,
-        url,
-      })),
+      attachments: mediaUrls.map((url) => {
+        // Infer media type by file extension (best-effort; DB stores string URLs only)
+        const clean = String(url).split("?")[0].toLowerCase();
+        const isVideo = /\.(mp4|webm|ogg|mov|m4v)$/.test(clean);
+        const mediaType: "image" | "video" = isVideo ? "video" : "image";
+        return {
+          id: url,
+          type: mediaType,
+          url,
+        };
+      }),
       tags: [], // Tag enrichment skipped (minimal implementation)
       meta: {
         model: row.model_name || undefined,
