@@ -14,36 +14,54 @@ import { Input } from "@/components/ui/input";
 import { Image as ImageIcon, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { optimizeMedia } from "@/lib/media-optimizer";
+import { optimizeMedia, type OptimizeOptions } from "@/lib/media-optimizer";
 
 type MediaItem = {
   file: File;
   url: string;
 };
 
-export default function DashboardCreatePage() {
-  // Limits
-  const MAX_FILES = 4;
-  const MAX_SIZE_MB = 20;
-  const MAX_SIZE = MAX_SIZE_MB * 1024 * 1024;
-  const MAX_CHARS = 1000;
+type VideoOptions = NonNullable<OptimizeOptions["video"]>;
 
-  // Content
+// TODO(video-upload): Re-enable video uploads in a later version.
+// Context: Video uploads were temporarily disabled because users were seeing
+// "Some files were skipped" errors when compression couldn't always reach the ~1MB
+// target even for inputs < 10MB. The UI now only accepts images and rejects videos.
+// 
+// When re-enabling, consider:
+// - Accepting videos up to a strict raw cap (e.g., 10MB) without requiring final ~1MB.
+// - Tuning optimizeMedia video settings (bitrate, resolution, fps, attempts) or adding a
+//   multi-pass strategy with a sensible floor to avoid excessive quality loss.
+// - Aligning frontend policy with /api/posts server validations so uploads aren’t rejected
+//   after client-side acceptance.
+// - Surfacing final file size in the UI so users understand any skips.
+// - Optionally offloading transcoding to a backend job and storing an optimized copy for feed.
+
+export default function DashboardCreatePage() {
+  const MAX_FILES = 4;
+  const IMAGE_MAX_MB = 5;
+  const VIDEO_RAW_MAX_MB = 10; // strict raw input cap
+  const VIDEO_TARGET_MB = 1; // compress to ~1MB after upload
+
+  const IMAGE_MAX_BYTES = IMAGE_MAX_MB * 1024 * 1024;
+  const VIDEO_RAW_MAX_BYTES = VIDEO_RAW_MAX_MB * 1024 * 1024;
+  const VIDEO_TARGET_BYTES = VIDEO_TARGET_MB * 1024 * 1024;
+
+  const MAX_CHARS = 2000;
+
   const [text, setText] = React.useState("");
   const [media, setMedia] = React.useState<MediaItem[]>([]);
   const [error, setError] = React.useState<string | null>(null);
 
-  // Drag & Optimize state
   const [isDragging, setIsDragging] = React.useState(false);
   const [isOptimizing, setIsOptimizing] = React.useState(false);
   const [optState, setOptState] = React.useState<{
     total: number;
     currentIndex: number;
-    currentPercent: number; // 0..100
+    currentPercent: number;
     fileName: string | null;
   }>({ total: 0, currentIndex: 0, currentPercent: 0, fileName: null });
 
-  // Meta
   const [tags, setTags] = React.useState<string[]>([]);
   const [tagInput, setTagInput] = React.useState("");
 
@@ -62,14 +80,12 @@ export default function DashboardCreatePage() {
     Others: [],
   };
 
-  // Derived
-  const remaining = MAX_CHARS - text.length;
+  const remaining = 2000 - text.length;
   const canPost =
     (text.trim().length > 0 || media.length > 0) &&
     remaining >= 0 &&
     !isOptimizing;
 
-  // Add files (optimize with 0–100% progress)
   const addFiles = async (files: File[]) => {
     setError(null);
 
@@ -80,79 +96,135 @@ export default function DashboardCreatePage() {
     }
 
     const availableSlots = MAX_FILES - currentCount;
-    const toProcess = files.slice(0, availableSlots);
-    if (toProcess.length === 0) return;
+    const picked = files.slice(0, availableSlots);
+
+    const valid: File[] = [];
+    let rejectedVideos = 0;
+    let rejectedImages = 0;
+
+    for (const f of picked) {
+      if (f.type.startsWith("video/")) {
+        // Videos are currently disabled
+        rejectedVideos++;
+        continue;
+      } else if (f.type.startsWith("image/")) {
+        if (f.size > IMAGE_MAX_BYTES) {
+          rejectedImages++;
+          continue;
+        }
+        valid.push(f);
+      }
+    }
+
+    if (!valid.length) {
+      const errs = [];
+      if (rejectedVideos)
+        errs.push(`${rejectedVideos} video(s) not supported`);
+      if (rejectedImages)
+        errs.push(`${rejectedImages} image(s) > ${IMAGE_MAX_MB}MB`);
+      const msg = errs.length
+        ? `Some files were rejected (${errs.join(", ")}).`
+        : "No valid files selected.";
+      setError(msg);
+      toast.error(msg);
+      return;
+    }
 
     setIsOptimizing(true);
     setOptState({
-      total: toProcess.length,
+      total: valid.length,
       currentIndex: 0,
       currentPercent: 0,
       fileName: null,
     });
 
     const added: MediaItem[] = [];
-    let skippedDueToSize = false;
+    let skippedAfterCompress = false;
 
-    for (let i = 0; i < toProcess.length; i++) {
-      const file = toProcess[i];
+    for (let i = 0; i < valid.length; i++) {
+      const file = valid[i];
+      const isVideo = file.type.startsWith("video/");
+      const perFileTargetBytes = isVideo ? VIDEO_TARGET_BYTES : IMAGE_MAX_BYTES;
+
       setOptState({
-        total: toProcess.length,
+        total: valid.length,
         currentIndex: i,
         currentPercent: 0,
         fileName: file.name,
       });
 
-      const result = await optimizeMedia(
-        file,
-        {
-          maxImageWidth: 2048,
-          maxImageHeight: 2048,
-          imageQuality: 0.82,
-          maxBytes: MAX_SIZE,
-          video: {
-            maxWidth: 1920,
-            maxHeight: 1080,
-            crf: 24,
-            preset: "veryslow",
-            fps: 30,
-            audioBitrate: "128k",
+      const baseVideo: VideoOptions = {
+        maxWidth: 960,
+        maxHeight: 960,
+        fps: 24,
+        preset: "medium",
+        attempts: 5,
+        audioBitrate: "48k",
+      };
+
+      const runOptimize = (vOverride?: Partial<VideoOptions>) =>
+        optimizeMedia(
+          file,
+          {
+            maxImageWidth: 2048,
+            maxImageHeight: 2048,
+            imageQuality: 0.82,
+            maxBytes: perFileTargetBytes,
+            ...(isVideo
+              ? { video: { ...baseVideo, ...(vOverride || {}) } }
+              : {}),
           },
-        },
-        (p) => {
-          const pct = Math.max(0, Math.min(100, Math.round(p * 100)));
-          setOptState((s) => ({
-            ...s,
-            currentIndex: i,
-            currentPercent: pct,
-            fileName: file.name,
-          }));
-        }
-      );
+          (p) => {
+            const pct = Math.max(0, Math.min(100, Math.round(p * 100)));
+            setOptState((s) => ({
+              ...s,
+              currentIndex: i,
+              currentPercent: pct,
+              fileName: file.name,
+            }));
+          }
+        );
 
-      const optimized = result.file;
+      let result = await runOptimize();
+      let optimized = result.file;
 
-      // Ensure percent snaps to 100 before moving on
       setOptState((s) => ({ ...s, currentPercent: 100 }));
 
-      if (optimized.size > MAX_SIZE) {
-        skippedDueToSize = true;
+      if (isVideo && optimized.size > perFileTargetBytes) {
+        const fallback = await runOptimize({
+          maxWidth: 640,
+          maxHeight: 640,
+          fps: 18,
+          audioBitrate: "32k",
+          preset: "medium",
+          attempts: 6,
+        });
+        if (fallback.file.size < optimized.size) {
+          result = fallback;
+          optimized = fallback.file;
+        }
+      }
+
+      if (optimized.size > perFileTargetBytes) {
+        skippedAfterCompress = true;
         continue;
       }
 
-      added.push({
-        file: optimized,
-        url: URL.createObjectURL(optimized),
-      });
-
-      // Yield to UI
+      added.push({ file: optimized, url: URL.createObjectURL(optimized) });
       await new Promise((r) => setTimeout(r, 0));
     }
 
-    if (skippedDueToSize) {
-      setError(
-        `Some files couldn't be reduced under ${MAX_SIZE_MB}MB and were skipped.`
-      );
+    if (rejectedVideos || rejectedImages || skippedAfterCompress) {
+      const parts = [];
+      if (rejectedVideos)
+        parts.push(`${rejectedVideos} video(s) not supported`);
+      if (rejectedImages)
+        parts.push(`${rejectedImages} image(s) > ${IMAGE_MAX_MB}MB`);
+      if (skippedAfterCompress)
+        parts.push(`some images exceeded ${IMAGE_MAX_MB}MB after optimization`);
+      const msg = `Some files were skipped (${parts.join(", ")}).`;
+      setError(msg);
+      toast.error(msg);
     }
 
     setMedia((prev) => [...prev, ...added]);
@@ -163,7 +235,7 @@ export default function DashboardCreatePage() {
     if (!e.target.files) return;
     const files = Array.from(e.target.files);
     await addFiles(files);
-    e.target.value = ""; // allow selecting same file again
+    e.target.value = "";
   };
 
   const handleDrop = async (e: React.DragEvent<HTMLLabelElement>) => {
@@ -196,7 +268,6 @@ export default function DashboardCreatePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Tags
   const addTag = (raw: string) => {
     const t = raw.trim();
     if (!t) return;
@@ -212,7 +283,6 @@ export default function DashboardCreatePage() {
     }
   };
 
-  // Submit
   const handlePost = async () => {
     if (!canPost || isOptimizing) return;
     setError(null);
@@ -232,14 +302,9 @@ export default function DashboardCreatePage() {
       );
       form.append("modelName", model === "others" ? customModel.trim() : model);
       form.append("tags", JSON.stringify(tags));
-
       media.forEach((m) => form.append("files", m.file));
 
-      const res = await fetch("/api/posts", {
-        method: "POST",
-        body: form,
-      });
-
+      const res = await fetch("/api/posts", { method: "POST", body: form });
       const data = await res.json();
       if (!res.ok || !data?.ok) {
         const msg = data?.error || "Failed to create post";
@@ -249,7 +314,6 @@ export default function DashboardCreatePage() {
       }
 
       toast.success("Post created");
-      // Reset form
       setText("");
       clearAllMedia();
       setTags([]);
@@ -268,7 +332,6 @@ export default function DashboardCreatePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Sticky Header */}
       <header className="sticky top-0 z-30 border-b bg-background/80 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex flex-col">
@@ -308,12 +371,9 @@ export default function DashboardCreatePage() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-          {/* Left: Composer */}
           <section className="lg:col-span-2 space-y-6">
-            {/* Prompt */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Your Prompt</label>
               <div className="relative">
@@ -339,13 +399,12 @@ export default function DashboardCreatePage() {
                       remaining >= 0 && remaining <= 25 && "text-amber-600"
                     )}
                   >
-                    {Math.max(remaining, -999)}/{MAX_CHARS}
+                    {Math.max(remaining, -999)}/2000
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* Media Uploader */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">Attachments</label>
@@ -384,13 +443,12 @@ export default function DashboardCreatePage() {
                       drag and drop
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Up to {MAX_FILES} files · {MAX_SIZE_MB}MB each · Images or
-                      Videos
+                      Up to {MAX_FILES} files · Images only (≤ {IMAGE_MAX_MB}MB)
                     </p>
                   </div>
                   <input
                     type="file"
-                    accept="image/*,video/*"
+                    accept="image/*"
                     multiple
                     className="sr-only"
                     onChange={handleMediaInput}
@@ -398,7 +456,6 @@ export default function DashboardCreatePage() {
                   />
                 </label>
 
-                {/* Optimization overlay with 0–100% */}
                 {isOptimizing && (
                   <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl bg-background/70 backdrop-blur-sm">
                     <div className="flex flex-col items-center gap-3">
@@ -430,7 +487,6 @@ export default function DashboardCreatePage() {
                 </div>
               )}
 
-              {/* Media Preview */}
               {media.length > 0 && (
                 <div
                   className={cn(
@@ -460,7 +516,6 @@ export default function DashboardCreatePage() {
                             controls
                           />
                         )}
-
                         <button
                           onClick={() => removeMediaAt(idx)}
                           className={cn(
@@ -482,9 +537,7 @@ export default function DashboardCreatePage() {
             </div>
           </section>
 
-          {/* Right: Details */}
           <aside className="space-y-8">
-            {/* Model */}
             <div className="space-y-2">
               <label className="text-sm font-medium">AI Model</label>
               <Select
@@ -512,7 +565,6 @@ export default function DashboardCreatePage() {
               )}
             </div>
 
-            {/* Category */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Category</label>
               <Select
@@ -543,7 +595,6 @@ export default function DashboardCreatePage() {
               )}
             </div>
 
-            {/* Subcategory */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Subcategory</label>
               {category !== "Others" ? (
@@ -582,7 +633,6 @@ export default function DashboardCreatePage() {
               )}
             </div>
 
-            {/* Tags */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Tags</label>
               <Input
