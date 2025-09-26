@@ -16,16 +16,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { cn } from "@/lib/utils";
 import {
   Bell,
   CreditCard,
@@ -39,7 +38,6 @@ import {
   ZoomOut,
   RotateCw,
   Maximize,
-  Download,
   Loader2,
   Sparkles,
   Coffee,
@@ -51,13 +49,18 @@ import {
   Citrus,
   Music,
   Code,
+  Check,
+  Camera,
+  X,
+  Upload,
+  Trash2,
+  Sunset,
+  Frame,
+  Gem,
 } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/util/supabase/client";
-import {
-  updateProfileAvatar,
-  type UpdateProfileAvatarState,
-} from "@/util/actions/profileActions";
+import { updateProfileAvatar } from "@/util/actions/profileActions";
 import { useTheme } from "next-themes";
 import { SectionHeader } from "./section-header";
 import SettingsUserCard from "./settings-user-card";
@@ -77,12 +80,32 @@ type Section =
   | "notifications"
   | "appearance";
 
-const NAV_ITEMS: { key: Section; label: string; icon: React.ElementType }[] = [
-  { key: "profile", label: "Profile", icon: UserIcon },
-  { key: "account", label: "Account", icon: CreditCard },
-  { key: "security", label: "Security", icon: Shield },
-  { key: "notifications", label: "Notifications", icon: Bell },
-  { key: "appearance", label: "Appearance", icon: Palette },
+const NAV_ITEMS: {
+  key: Section;
+  label: string;
+  icon: React.ElementType;
+  color?: string;
+}[] = [
+  { key: "profile", label: "Profile", icon: UserIcon, color: "text-blue-500" },
+  {
+    key: "account",
+    label: "Account",
+    icon: CreditCard,
+    color: "text-green-500",
+  },
+  { key: "security", label: "Security", icon: Shield, color: "text-red-500" },
+  {
+    key: "notifications",
+    label: "Notifications",
+    icon: Bell,
+    color: "text-yellow-500",
+  },
+  {
+    key: "appearance",
+    label: "Appearance",
+    icon: Palette,
+    color: "text-purple-500",
+  },
 ];
 
 interface ColorPaletteConfig {
@@ -98,14 +121,15 @@ interface ColorPaletteConfig {
     background: string;
     foreground: string;
   };
-  dataThemeAttribute?: string; // Optional: only if different from id
+  dataThemeAttribute?: string;
 }
 
 const COLOR_PALETTES: ColorPaletteConfig[] = [
   {
     id: "default",
     label: "Default",
-    description: "Clean and modern appearance",
+    description:
+      "A balanced, clean, and modern appearance suitable for any interface.",
     icon: Sparkles,
     preview: {
       primary: "bg-[#e5e5e5]",
@@ -119,7 +143,8 @@ const COLOR_PALETTES: ColorPaletteConfig[] = [
   {
     id: "mocha-mousse",
     label: "Mocha Mousse",
-    description: "Warm and cozy appearance",
+    description:
+      "Warm, soft, and cozy tones that bring a sense of comfort and familiarity.",
     icon: Coffee,
     preview: {
       primary: "bg-[#a67c52]",
@@ -133,7 +158,7 @@ const COLOR_PALETTES: ColorPaletteConfig[] = [
   {
     id: "cyberpunk",
     label: "Cyberpunk",
-    description: "Futuristic neon colors",
+    description: "Bold neon colors with a futuristic and edgy aesthetic.",
     icon: Zap,
     preview: {
       primary: "bg-[#ff00c8]",
@@ -147,7 +172,8 @@ const COLOR_PALETTES: ColorPaletteConfig[] = [
   {
     id: "claude",
     label: "Claude",
-    description: "Inspired by Anthropic's Claude",
+    description:
+      "Minimal and thoughtful palette inspired by Anthropic's Claude.",
     icon: Flower2,
     preview: {
       primary: "bg-[#d97757]",
@@ -161,7 +187,8 @@ const COLOR_PALETTES: ColorPaletteConfig[] = [
   {
     id: "twitter",
     label: "Twitter",
-    description: "Inspired by Twitter's color scheme",
+    description:
+      "Bright, sleek palette inspired by Twitter's signature blue and dark tones.",
     icon: Bird,
     preview: {
       primary: "bg-[#1c9cf0]",
@@ -175,7 +202,8 @@ const COLOR_PALETTES: ColorPaletteConfig[] = [
   {
     id: "ghibli-studio",
     label: "Ghibli Studio",
-    description: "Inspired by Studio Ghibli's aesthetic",
+    description:
+      "Earthy and nostalgic hues inspired by Studio Ghibli's warm aesthetic.",
     icon: Mountain,
     preview: {
       primary: "bg-[#8b906e]",
@@ -189,7 +217,8 @@ const COLOR_PALETTES: ColorPaletteConfig[] = [
   {
     id: "tangerine",
     label: "Tangerine",
-    description: "Bright and vibrant colors",
+    description:
+      "Playful, bright, and energetic colors that bring vibrancy to your UI.",
     icon: Citrus,
     preview: {
       primary: "bg-[#e05d38]",
@@ -203,7 +232,8 @@ const COLOR_PALETTES: ColorPaletteConfig[] = [
   {
     id: "spotify",
     label: "Spotify",
-    description: "Dark theme inspired by Spotify",
+    description:
+      "A deep, dark theme highlighted with Spotify's signature green accent.",
     icon: Music,
     preview: {
       primary: "bg-[#00b262]",
@@ -217,7 +247,8 @@ const COLOR_PALETTES: ColorPaletteConfig[] = [
   {
     id: "vs-code",
     label: "VS Code",
-    description: "Inspired by Visual Studio Code",
+    description:
+      "Cool, focused tones inspired by Visual Studio Code's developer aesthetic.",
     icon: Code,
     preview: {
       primary: "bg-[#26acf4]",
@@ -231,7 +262,8 @@ const COLOR_PALETTES: ColorPaletteConfig[] = [
   {
     id: "caffeine",
     label: "Caffeine",
-    description: "High contrast for focus",
+    description:
+      "High-contrast palette designed to keep you sharp and focused.",
     icon: Coffee,
     preview: {
       primary: "bg-[#fcdfc2]",
@@ -245,7 +277,8 @@ const COLOR_PALETTES: ColorPaletteConfig[] = [
   {
     id: "nature",
     label: "Nature",
-    description: "Earthy and natural tones",
+    description:
+      "Organic, earthy tones that bring a calming and natural balance.",
     icon: Flower2,
     preview: {
       primary: "bg-[#6a994e]",
@@ -256,15 +289,60 @@ const COLOR_PALETTES: ColorPaletteConfig[] = [
       foreground: "bg-[#f1faee]",
     },
   },
+  {
+    id: "blue-print",
+    label: "Blueprint",
+    description:
+      "A wireframe-inspired palette with structured lines and deep blueprint tones.",
+    icon: Frame,
+    preview: {
+      primary: "bg-[#8b5cf6]",
+      secondary: "bg-[#1e1b4b]",
+      accent: "bg-[#4338ca]",
+      muted: "bg-[#1e1b4b]",
+      background: "bg-[#0f172a]",
+      foreground: "bg-[#e0e7ff]",
+    },
+  },
+  {
+    id: "sunset",
+    label: "Sunset",
+    description:
+      "Warm and radiant hues inspired by the calming beauty of a sunset.",
+    icon: Sunset,
+    preview: {
+      primary: "bg-[#ff7e5f]",
+      secondary: "bg-[#ffedea]",
+      accent: "bg-[#feb47b]",
+      muted: "bg-[#fff0eb]",
+      background: "bg-[#fff9f5]",
+      foreground: "bg-[#3d3436]",
+    },
+  },
+  {
+    id: "amethyst-haze",
+    label: "Amethyst Haze",
+    description:
+      "Soft, dreamy purples and gentle tones that evoke the elegance of twilight.",
+    icon: Gem,
+    preview: {
+      primary: "bg-[#8a79ab]",
+      secondary: "bg-[#dfd9ec]",
+      accent: "bg-[#e6a5b8]",
+      muted: "bg-[#dcd9e3]",
+      background: "bg-[#f8f7fa]",
+      foreground: "bg-[#3d3c4f]",
+    },
+  },
 ];
 
-const getPaletteConfig = (id: string): ColorPaletteConfig | undefined => {
-  return COLOR_PALETTES.find((p) => p.id === id);
-};
+const getPaletteConfig = (id: string): ColorPaletteConfig | undefined =>
+  COLOR_PALETTES.find((p) => p.id === id);
 
 type ThemeChoice = "system" | "light" | "dark";
 type ColorPalette = (typeof COLOR_PALETTES)[number]["id"];
 
+// Mobile-first settings with creative navigation
 export function SettingsDialog({
   userId,
   name,
@@ -279,6 +357,15 @@ export function SettingsDialog({
   const [themeChoice, setThemeChoice] = React.useState<ThemeChoice>("system");
   const [colorPalette, setColorPalette] =
     React.useState<ColorPalette>("default");
+  const [isMobile, setIsMobile] = React.useState(false);
+
+  // Detect mobile
+  React.useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   React.useEffect(() => setMounted(true), []);
   React.useEffect(() => {
@@ -289,34 +376,22 @@ export function SettingsDialog({
   }, [mounted, theme]);
 
   React.useEffect(() => {
-    const savedPalette = localStorage.getItem("color-palette");
-    // Validate that the saved palette exists in our configuration
-    if (savedPalette && getPaletteConfig(savedPalette)) {
-      setColorPalette(savedPalette as ColorPalette);
-      applyColorPalette(savedPalette as ColorPalette);
+    const saved = localStorage.getItem("color-palette");
+    if (saved && getPaletteConfig(saved)) {
+      setColorPalette(saved as ColorPalette);
+      applyColorPalette(saved as ColorPalette);
     }
   }, []);
 
-  const applyColorPalette = (paletteId: ColorPalette) => {
-    const config = getPaletteConfig(paletteId);
-    if (!config) return;
-
-    // Remove all existing palette data-theme attributes
-    COLOR_PALETTES.forEach((p) => {
-      const attr = p.dataThemeAttribute || p.id;
-      if (attr !== "default") {
-        document.documentElement.removeAttribute(`data-theme`);
-      }
-    });
-
-    // Apply new palette if not default
+  const applyColorPalette = React.useCallback((paletteId: ColorPalette) => {
+    const root = document.documentElement;
+    root.removeAttribute("data-theme");
     if (paletteId !== "default") {
-      const themeAttribute = config.dataThemeAttribute || config.id;
-      document.documentElement.setAttribute("data-theme", themeAttribute);
+      const cfg = getPaletteConfig(paletteId);
+      root.setAttribute("data-theme", cfg?.dataThemeAttribute ?? paletteId);
     }
-
     localStorage.setItem("color-palette", paletteId);
-  };
+  }, []);
 
   const trimmedName = name?.trim() || "";
   const initials = React.useMemo(() => {
@@ -331,6 +406,18 @@ export function SettingsDialog({
 
   const [imgError, setImgError] = React.useState(false);
   const [active, setActive] = React.useState<Section>(initialSection);
+  const [prevActive, setPrevActive] = React.useState<Section>(initialSection);
+
+  // Track animation direction
+  const isMovingForward =
+    NAV_ITEMS.findIndex((i) => i.key === active) >
+    NAV_ITEMS.findIndex((i) => i.key === prevActive);
+
+  React.useEffect(() => {
+    if (active !== prevActive) {
+      setPrevActive(active);
+    }
+  }, [active]);
 
   const [localAvatar, setLocalAvatar] = React.useState<string | null>(null);
   const [avatarFile, setAvatarFile] = React.useState<File | null>(null);
@@ -340,45 +427,46 @@ export function SettingsDialog({
 
   const [cropperOpen, setCropperOpen] = React.useState(false);
   const [tempImageUrl, setTempImageUrl] = React.useState<string | null>(null);
+  const [croppedObjectUrl, setCroppedObjectUrl] = React.useState<string | null>(
+    null
+  );
+  const [avatarOptionsOpen, setAvatarOptionsOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    return () => {
+      if (tempImageUrl?.startsWith("blob:")) URL.revokeObjectURL(tempImageUrl);
+      if (croppedObjectUrl?.startsWith("blob:"))
+        URL.revokeObjectURL(croppedObjectUrl);
+    };
+  }, [tempImageUrl, croppedObjectUrl]);
 
   const [savingSection, setSavingSection] = React.useState<Section | null>(
     null
   );
   const isSaving = (section: Section) => savingSection === section;
 
-  const [avatarState, avatarAction] = React.useActionState<
-    UpdateProfileAvatarState,
-    FormData
-  >(updateProfileAvatar, { ok: false, error: null, publicUrl: undefined });
-  React.useEffect(() => {
-    if (avatarState?.ok) {
-      if (avatarState.publicUrl === null) {
-        setLocalAvatar(null);
-      } else if (avatarState.publicUrl) {
-        setLocalAvatar(avatarState.publicUrl);
-      }
-    } else if (avatarState?.error) {
-      toast.error(avatarState.error);
-    }
-  }, [avatarState]);
+  const avatarInputId = React.useId();
 
   const onAvatarFile = (file?: File | null) => {
     if (!file) return;
+    setAvatarOptionsOpen(false);
     const url = URL.createObjectURL(file);
     setTempImageUrl(url);
     setCropperOpen(true);
   };
 
   const handleCropComplete = (croppedUrl: string, file: File) => {
+    if (croppedObjectUrl?.startsWith("blob:")) {
+      URL.revokeObjectURL(croppedObjectUrl);
+    }
     setLocalAvatar(croppedUrl);
+    setCroppedObjectUrl(croppedUrl);
     setAvatarFile(file);
     setAvatarRemoved(false);
     setImgError(false);
     setCropperOpen(false);
     toast.success("Avatar updated", {
-      description: `Optimized to ${formatFileSize(
-        file.size
-      )}. Don't forget to save.`,
+      description: `Optimized to ${formatFileSize(file.size)}`,
     });
   };
 
@@ -389,7 +477,6 @@ export function SettingsDialog({
     const promise = (async () => {
       if (section === "profile" || section === "account") {
         const supabase = createClient();
-
         const newName = nameRef.current?.value?.trim() || "";
         const newEmail = emailRef.current?.value?.trim() || "";
 
@@ -405,19 +492,14 @@ export function SettingsDialog({
         }
 
         const updatePayload: any = {};
-        // Only update display_name when editing the Profile section and when a non-empty name is present.
-        if (section === "profile") {
-          const safeName = newName;
-          if (safeName && safeName !== trimmedName) {
-            updatePayload.data = { display_name: safeName };
-          }
+        if (section === "profile" && newName && newName !== trimmedName) {
+          updatePayload.data = { display_name: newName };
         }
         if (newEmail && newEmail !== email) updatePayload.email = newEmail;
+
         if (Object.keys(updatePayload).length > 0) {
-          const { error: updateError } = await supabase.auth.updateUser(
-            updatePayload
-          );
-          if (updateError) throw updateError;
+          const { error } = await supabase.auth.updateUser(updatePayload);
+          if (error) throw error;
         }
       } else {
         await new Promise((res) => setTimeout(res, 400));
@@ -437,40 +519,73 @@ export function SettingsDialog({
     }
   };
 
-  const paletteGridCols =
-    COLOR_PALETTES.length <= 2
-      ? "sm:grid-cols-2"
-      : COLOR_PALETTES.length === 3
-      ? "sm:grid-cols-3"
-      : "sm:grid-cols-2 lg:grid-cols-3";
+  const currentNav = NAV_ITEMS.find((item) => item.key === active);
 
   return (
     <>
-      <DialogContent className="p-0 overflow-hidden w-[900px] h-[640px] sm:max-w-[900px] max-w-[95vw]">
+      <DialogContent
+        className={cn(
+          "p-0 overflow-hidden bg-background",
+          // Mobile: fullscreen
+          "w-screen h-[80svh] max-h-[100svh] rounded-none border-0",
+          // Desktop: contained
+          "sm:w-[900px] sm:max-w-[900px] sm:h-[640px] sm:rounded-xl sm:border"
+        )}
+      >
         <div className="flex h-full flex-col">
-          <DialogHeader className="shrink-0 border-b p-6">
+          {/* Mobile Header with Back Navigation */}
+          <div className="md:hidden sticky top-0 z-30 border-b bg-background">
+            <div className="flex items-center justify-between p-4">
+              <div className="flex items-center gap-3">
+                {currentNav && (
+                  <>
+                    <currentNav.icon
+                      className={cn("h-5 w-5", currentNav.color)}
+                    />
+                    <span className="font-semibold">{currentNav.label}</span>
+                  </>
+                )}
+              </div>
+              {active !== "appearance" && (
+                <Button
+                  size="sm"
+                  onClick={() => handleSave(active)}
+                  disabled={isSaving(active)}
+                  className="h-8 px-3"
+                >
+                  {isSaving(active) ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Check className="h-4 w-4" />
+                  )}
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Desktop Header */}
+          <DialogHeader className="hidden md:block sticky top-0 z-20 border-b p-6 bg-background">
             <DialogTitle>Settings</DialogTitle>
             <DialogDescription>
               Manage your account preferences.
             </DialogDescription>
           </DialogHeader>
 
+          {/* Main Content */}
           <div className="flex-1 grid min-h-0 grid-cols-1 md:grid-cols-[240px_1fr]">
-            <aside className="border-r overflow-y-auto">
-              <div className="p-4 md:p-6">
+            {/* Desktop Sidebar */}
+            <aside className="hidden md:block border-r overflow-y-auto">
+              <div className="p-6">
                 <div className="mb-6 flex items-center gap-3">
-                  <Avatar className="h-10 w-10 ring-1 ring-border">
-                    {effectiveImage ? (
+                  <Avatar className="h-10 w-10">
+                    {effectiveImage && (
                       <AvatarImage
                         src={effectiveImage}
                         alt={trimmedName || "User"}
-                        loading="lazy"
                         onError={() => setImgError(true)}
                       />
-                    ) : null}
-                    <AvatarFallback className="bg-secondary text-secondary-foreground">
-                      {initials}
-                    </AvatarFallback>
+                    )}
+                    <AvatarFallback>{initials}</AvatarFallback>
                   </Avatar>
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium">
@@ -482,108 +597,120 @@ export function SettingsDialog({
                   </div>
                 </div>
 
-                <nav aria-label="Settings sections" className="space-y-1">
-                  {NAV_ITEMS.map(({ key, label, icon: Icon }) => {
-                    const activeItem = active === key;
-                    return (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => setActive(key)}
-                        aria-current={activeItem ? "page" : undefined}
-                        className={[
-                          "w-full flex items-center gap-2 rounded-md px-2 py-2 text-sm",
-                          activeItem
-                            ? "bg-accent text-accent-foreground"
-                            : "text-muted-foreground hover:text-foreground hover:bg-muted",
-                          "transition-colors",
-                        ].join(" ")}
-                      >
-                        <Icon className="h-4 w-4" aria-hidden="true" />
-                        <span>{label}</span>
-                      </button>
-                    );
-                  })}
+                <nav className="space-y-1">
+                  {NAV_ITEMS.map(({ key, label, icon: Icon }) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setActive(key)}
+                      className={cn(
+                        "w-full flex items-center gap-2 rounded-md px-2 py-2 text-sm transition-colors",
+                        active === key
+                          ? "bg-accent text-accent-foreground"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                      )}
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span>{label}</span>
+                    </button>
+                  ))}
                 </nav>
               </div>
             </aside>
 
+            {/* Content Area with Slide Animation */}
             <main
-              className={[
-                "p-4 md:p-6",
-                active === "appearance"
-                  ? "overflow-hidden min-h-0"
-                  : "overflow-y-auto",
-              ].join(" ")}
+              className={cn(
+                "relative min-h-0 overflow-hidden",
+                "pb-20 md:pb-0" // Space for mobile bottom nav
+              )}
             >
-              {active === "profile" && (
-                <section>
-                  <SectionHeader
-                    title="Profile"
-                    description="Update your name, avatar, and contact information."
-                  />
+              <div
+                className={cn(
+                  "absolute inset-0 overflow-y-auto p-4 md:p-6",
+                  "animate-in fade-in-0 duration-200",
+                  isMovingForward
+                    ? "slide-in-from-right-10"
+                    : "slide-in-from-left-10"
+                )}
+                key={active}
+              >
+                {active === "profile" && (
+                  <section className="space-y-6">
+                    <SectionHeader
+                      title="Profile"
+                      description="Update your personal information"
+                    />
 
-                  <div className="mt-6 grid gap-6">
-                    <div className="flex items-center gap-4">
-                      <Avatar className="h-16 w-16 ring-1 ring-border">
-                        {effectiveImage ? (
-                          <AvatarImage
-                            src={effectiveImage}
-                            alt={trimmedName || "User"}
-                            loading="lazy"
-                            onError={() => setImgError(true)}
-                          />
-                        ) : null}
-                        <AvatarFallback className="bg-secondary text-secondary-foreground text-lg">
-                          {initials}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="space-x-2">
-                        <label htmlFor="avatar" className="sr-only">
-                          Upload avatar
-                        </label>
-                        <input
-                          id="avatar"
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => onAvatarFile(e.target.files?.[0])}
-                        />
-                        <Button
-                          variant="secondary"
-                          onClick={() =>
-                            document.getElementById("avatar")?.click()
-                          }
-                        >
-                          Upload new
-                        </Button>
-                        {effectiveImage && (
-                          <Button
-                            variant="ghost"
-                            onClick={() => {
-                              setLocalAvatar(null);
-                              setImgError(false);
-                              setAvatarFile(null);
-                              setAvatarRemoved(true);
-                              toast("Avatar removed", {
-                                description:
-                                  "Your initials will be used instead.",
-                              });
-                            }}
-                          >
-                            Remove
-                          </Button>
+                    {/* Mobile-optimized Avatar Section */}
+                    <div className="flex flex-col items-center sm:flex-row sm:items-start gap-4">
+                      <button
+                        onClick={() => isMobile && setAvatarOptionsOpen(true)}
+                        className="relative group cursor-pointer"
+                      >
+                        <Avatar className="h-24 w-24 sm:h-16 sm:w-16 ring-2 ring-border">
+                          {effectiveImage && (
+                            <AvatarImage
+                              src={effectiveImage}
+                              alt={trimmedName || "User"}
+                              onError={() => setImgError(true)}
+                            />
+                          )}
+                          <AvatarFallback className="text-2xl sm:text-lg">
+                            {initials}
+                          </AvatarFallback>
+                        </Avatar>
+                        {isMobile && (
+                          <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Camera className="h-6 w-6 text-white" />
+                          </div>
                         )}
-                      </div>
+                      </button>
+
+                      {/* Desktop Avatar Actions */}
+                      {!isMobile && (
+                        <div className="space-x-2">
+                          <input
+                            id={avatarInputId}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => onAvatarFile(e.target.files?.[0])}
+                          />
+                          <Button
+                            variant="secondary"
+                            onClick={() =>
+                              document.getElementById(avatarInputId)?.click()
+                            }
+                          >
+                            Upload new
+                          </Button>
+                          {effectiveImage && (
+                            <Button
+                              variant="ghost"
+                              onClick={() => {
+                                setLocalAvatar(null);
+                                setImgError(false);
+                                setAvatarFile(null);
+                                setAvatarRemoved(true);
+                                toast("Avatar removed");
+                              }}
+                            >
+                              Remove
+                            </Button>
+                          )}
+                        </div>
+                      )}
                     </div>
 
-                    <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid gap-4">
                       <div className="grid gap-2">
                         <Label htmlFor="name">Name</Label>
                         <Input
                           id="name"
                           defaultValue={trimmedName}
                           ref={nameRef}
+                          className="h-12 text-base sm:h-10 sm:text-sm"
                         />
                       </div>
                       <div className="grid gap-2">
@@ -593,219 +720,220 @@ export function SettingsDialog({
                           defaultValue={email}
                           type="email"
                           ref={emailRef}
+                          className="h-12 text-base sm:h-10 sm:text-sm"
                         />
                       </div>
                     </div>
-                  </div>
-                </section>
-              )}
-
-              {active === "account" && <SettingsUserCard />}
-
-              {active === "security" && (
-                <section>
-                  <SectionHeader
-                    title="Security"
-                    description="Manage password and two-factor authentication."
-                  />
-                  <div className="mt-6 grid gap-6">
-                    <div className="grid gap-4 sm:grid-cols-3">
-                      <div className="grid gap-2">
-                        <Label htmlFor="current-password">
-                          Current password
-                        </Label>
-                        <Input id="current-password" type="password" />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="new-password">New password</Label>
-                        <Input id="new-password" type="password" />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="confirm-password">
-                          Confirm password
-                        </Label>
-                        <Input id="confirm-password" type="password" />
-                      </div>
-                    </div>
-
-                    <Separator />
-
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <div className="text-sm font-medium">
-                          Two-factor authentication
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          Add an extra layer of security to your account.
-                        </div>
-                      </div>
-                      <Switch
-                        onCheckedChange={(checked) =>
-                          toast(
-                            checked
-                              ? "Two-factor authentication enabled"
-                              : "Two-factor authentication disabled",
-                            {
-                              description:
-                                "This will be applied when you save changes.",
-                            }
-                          )
-                        }
-                      />
-                    </div>
-                  </div>
-                </section>
-              )}
-
-              {active === "notifications" && (
-                <section>
-                  <SectionHeader
-                    title="Notifications"
-                    description="Choose how you want to receive updates."
-                  />
-                  <div className="mt-6 grid gap-6">
-                    <div className="space-y-4">
-                      <ToggleRow
-                        label="Product updates"
-                        description="Announcements and release notes."
-                        onChange={(v) =>
-                          toast(
-                            `Product updates ${v ? "enabled" : "disabled"}`,
-                            {
-                              description:
-                                "This will be applied when you save changes.",
-                            }
-                          )
-                        }
-                      />
-                      <ToggleRow
-                        label="Email notifications"
-                        description="Get important updates by email."
-                        onChange={(v) =>
-                          toast(
-                            `Email notifications ${v ? "enabled" : "disabled"}`,
-                            {
-                              description:
-                                "This will be applied when you save changes.",
-                            }
-                          )
-                        }
-                      />
-                      <ToggleRow
-                        label="Marketing emails"
-                        description="Occasional product tips and offers."
-                        onChange={(v) =>
-                          toast(
-                            `Marketing emails ${v ? "enabled" : "disabled"}`,
-                            {
-                              description:
-                                "This will be applied when you save changes.",
-                            }
-                          )
-                        }
-                      />
-                    </div>
-                  </div>
-                </section>
-              )}
-
-              {active === "appearance" && (
-                <ScrollArea className="h-[500px] pr-5">
-                  <section className="space-y-6">
-                    <div>
-                      <SectionHeader
-                        title="Appearance"
-                        description="Choose a theme. Preview cards show how the UI will look."
-                      />
-                      <div
-                        role="radiogroup"
-                        aria-label="Theme"
-                        className="mt-6 grid gap-4 sm:grid-cols-3"
-                      >
-                        <ThemeOptionButton
-                          value="system"
-                          label="System"
-                          Icon={Monitor}
-                          selected={themeChoice === "system"}
-                          onSelect={(v) => {
-                            setThemeChoice(v);
-                            setTheme(v);
-                            toast("Theme set to System", {
-                              description: "Applied immediately.",
-                            });
-                          }}
-                        />
-                        <ThemeOptionButton
-                          value="light"
-                          label="Light"
-                          Icon={Sun}
-                          selected={themeChoice === "light"}
-                          onSelect={(v) => {
-                            setThemeChoice(v);
-                            setTheme(v);
-                            toast("Theme set to Light", {
-                              description: "Applied immediately.",
-                            });
-                          }}
-                        />
-                        <ThemeOptionButton
-                          value="dark"
-                          label="Dark"
-                          Icon={Moon}
-                          selected={themeChoice === "dark"}
-                          onSelect={(v) => {
-                            setThemeChoice(v);
-                            setTheme(v);
-                            toast("Theme set to Dark", {
-                              description: "Applied immediately.",
-                            });
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    {COLOR_PALETTES.length > 0 && (
-                      <>
-                        <Separator />
-                        <div>
-                          <SectionHeader
-                            title="Special"
-                            description="Choose a unique color palette for your interface."
-                          />
-                          <div
-                            role="radiogroup"
-                            aria-label="Color Palette"
-                            className={`mt-6 grid gap-4 ${paletteGridCols}`}
-                          >
-                            {COLOR_PALETTES.map((palette) => (
-                              <ColorPaletteOptionButton
-                                key={palette.id}
-                                config={palette}
-                                selected={colorPalette === palette.id}
-                                onSelect={() => {
-                                  setColorPalette(palette.id as ColorPalette);
-                                  applyColorPalette(palette.id as ColorPalette);
-                                  toast(
-                                    `Color palette set to ${palette.label}`,
-                                    {
-                                      description: palette.description,
-                                    }
-                                  );
-                                }}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      </>
-                    )}
                   </section>
-                </ScrollArea>
-              )}
+                )}
+
+                {active === "account" && <SettingsUserCard />}
+
+                {active === "security" && (
+                  <section className="space-y-6">
+                    <SectionHeader
+                      title="Security"
+                      description="Manage your account security"
+                    />
+
+                    <div className="space-y-4">
+                      <Card
+                        title="Password"
+                        description="Change your password"
+                        action={
+                          <Button variant="outline" size="sm">
+                            Update
+                          </Button>
+                        }
+                      />
+
+                      <Card
+                        title="Two-factor authentication"
+                        description="Add an extra layer of security"
+                        action={
+                          <Switch
+                            onCheckedChange={(checked) =>
+                              toast(checked ? "2FA enabled" : "2FA disabled")
+                            }
+                          />
+                        }
+                      />
+                    </div>
+                  </section>
+                )}
+
+                {active === "notifications" && (
+                  <section className="space-y-6">
+                    <SectionHeader
+                      title="Notifications"
+                      description="Choose how you receive updates"
+                    />
+
+                    <div className="space-y-2">
+                      {[
+                        {
+                          label: "Product updates",
+                          desc: "New features and improvements",
+                        },
+                        {
+                          label: "Security alerts",
+                          desc: "Important security notifications",
+                        },
+                        {
+                          label: "Marketing",
+                          desc: "Tips, offers, and announcements",
+                        },
+                      ].map((item) => (
+                        <Card
+                          key={item.label}
+                          title={item.label}
+                          description={item.desc}
+                          action={
+                            <Switch
+                              onCheckedChange={(v) =>
+                                toast(`${item.label} ${v ? "on" : "off"}`)
+                              }
+                            />
+                          }
+                        />
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {active === "appearance" && (
+                  <section className="space-y-6">
+                    <SectionHeader
+                      title="Appearance"
+                      description="Customize your interface"
+                    />
+
+                    {/* Theme Selection - Mobile optimized */}
+                    <div className="space-y-3">
+                      <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+                        Theme
+                      </Label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          {
+                            value: "system" as const,
+                            label: "Auto",
+                            icon: Monitor,
+                          },
+                          {
+                            value: "light" as const,
+                            label: "Light",
+                            icon: Sun,
+                          },
+                          { value: "dark" as const, label: "Dark", icon: Moon },
+                        ].map(({ value, label, icon: Icon }) => (
+                          <button
+                            key={value}
+                            onClick={() => {
+                              setThemeChoice(value);
+                              setTheme(value);
+                              toast(`Theme: ${label}`);
+                            }}
+                            className={cn(
+                              "relative flex flex-col items-center gap-2 rounded-lg border-2 p-3 transition-all",
+                              themeChoice === value
+                                ? "border-primary bg-primary/5"
+                                : "border-border hover:border-primary/40"
+                            )}
+                          >
+                            <Icon className="h-5 w-5" />
+                            <span className="text-xs">{label}</span>
+                            {themeChoice === value && (
+                              <div className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary flex items-center justify-center">
+                                <Check className="h-2.5 w-2.5 text-primary-foreground" />
+                              </div>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Color Palettes - Mobile optimized grid */}
+                    <div className="space-y-3">
+                      <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+                        Color Scheme
+                      </Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {COLOR_PALETTES.map((palette) => (
+                          <button
+                            key={palette.id}
+                            onClick={() => {
+                              const id = palette.id as ColorPalette;
+                              setColorPalette(id);
+                              applyColorPalette(id);
+                              toast(`Palette: ${palette.label}`);
+                            }}
+                            className={cn(
+                              "relative rounded-lg border-2 p-3 text-left transition-all",
+                              colorPalette === palette.id
+                                ? "border-primary bg-primary/5"
+                                : "border-border hover:border-primary/40"
+                            )}
+                          >
+                            <div className="flex items-center gap-2 mb-2">
+                              <palette.icon className="h-4 w-4" />
+                              <span className="text-sm font-medium">
+                                {palette.label}
+                              </span>
+                            </div>
+                            <div className="text-xs text-muted-foreground mb-2">
+                              {palette.description}
+                            </div>
+                            <ColorSwatches preview={palette.preview} />
+                            {colorPalette === palette.id && (
+                              <div className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary flex items-center justify-center">
+                                <Check className="h-2.5 w-2.5 text-primary-foreground" />
+                              </div>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </section>
+                )}
+              </div>
             </main>
           </div>
 
+          {/* Mobile Bottom Navigation - Icon Only */}
+          <div className="md:hidden sticky bottom-0 z-30 border-t bg-background/95 backdrop-blur">
+            <nav className="flex items-center justify-around py-2">
+              {NAV_ITEMS.map(({ key, label, icon: Icon, color }) => {
+                const isActive = active === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setActive(key)}
+                    className={cn(
+                      "relative flex flex-col items-center justify-center p-2 rounded-lg transition-all",
+                      "hover:bg-muted/50 active:scale-95",
+                      isActive && "bg-muted"
+                    )}
+                  >
+                    <Icon
+                      className={cn(
+                        "h-6 w-6 transition-colors",
+                        isActive ? color : "text-muted-foreground"
+                      )}
+                    />
+                    {isActive && (
+                      <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 h-1 w-1 rounded-full bg-primary" />
+                    )}
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+
+          {/* Desktop Save Button */}
           {active !== "appearance" && (
-            <div className="shrink-0 border-t p-4 md:p-6 flex justify-end">
+            <div className="hidden md:flex sticky bottom-0 border-t p-6 justify-end bg-background">
               <Button
                 onClick={() => handleSave(active)}
                 disabled={isSaving(active)}
@@ -817,39 +945,95 @@ export function SettingsDialog({
         </div>
       </DialogContent>
 
-      {/* Image Cropper Dialog */}
+      {/* Mobile Avatar Options Sheet */}
+      <Sheet open={avatarOptionsOpen} onOpenChange={setAvatarOptionsOpen}>
+        <SheetContent side="bottom" className="rounded-t-2xl">
+          <SheetHeader>
+            <SheetTitle>Change Avatar</SheetTitle>
+            <SheetDescription>Choose an option</SheetDescription>
+          </SheetHeader>
+          <div className="grid gap-2 py-4">
+            <input
+              id={avatarInputId}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => onAvatarFile(e.target.files?.[0])}
+            />
+            <Button
+              variant="outline"
+              className="justify-start"
+              onClick={() => {
+                document.getElementById(avatarInputId)?.click();
+              }}
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              Upload Photo
+            </Button>
+            <Button
+              variant="outline"
+              className="justify-start"
+              onClick={() => {
+                setAvatarOptionsOpen(false);
+                // Camera capture logic here
+                toast("Camera not available in browser");
+              }}
+            >
+              <Camera className="mr-2 h-4 w-4" />
+              Take Photo
+            </Button>
+            {effectiveImage && (
+              <Button
+                variant="outline"
+                className="justify-start text-destructive"
+                onClick={() => {
+                  setLocalAvatar(null);
+                  setImgError(false);
+                  setAvatarFile(null);
+                  setAvatarRemoved(true);
+                  setAvatarOptionsOpen(false);
+                  toast("Avatar removed");
+                }}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Remove Current Photo
+              </Button>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Image Cropper */}
       {cropperOpen && tempImageUrl && (
-        <ImageCropper
+        <MobileFriendlyCropper
           open={cropperOpen}
-          onOpenChange={setCropperOpen}
+          onOpenChange={(open) => {
+            setCropperOpen(open);
+            if (!open && tempImageUrl?.startsWith("blob:")) {
+              URL.revokeObjectURL(tempImageUrl);
+              setTempImageUrl(null);
+            }
+          }}
           imageUrl={tempImageUrl}
           onCropComplete={handleCropComplete}
-          aspectRatio={1}
-          cropShape="round"
         />
       )}
     </>
   );
 }
 
-// Image Cropper Component
-interface ImageCropperProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  imageUrl: string;
-  onCropComplete: (croppedImage: string, file: File) => void;
-  aspectRatio?: number;
-  cropShape?: "rect" | "round";
-}
-
-function ImageCropper({
+// Mobile-optimized cropper
+function MobileFriendlyCropper({
   open,
   onOpenChange,
   imageUrl,
   onCropComplete,
-  aspectRatio = 1,
-  cropShape = "round",
-}: ImageCropperProps) {
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  imageUrl: string;
+  onCropComplete: (url: string, file: File) => void;
+}) {
   const [crop, setCrop] = React.useState<Point>({ x: 0, y: 0 });
   const [zoom, setZoom] = React.useState(1);
   const [rotation, setRotation] = React.useState(0);
@@ -857,230 +1041,156 @@ function ImageCropper({
     null
   );
   const [isProcessing, setIsProcessing] = React.useState(false);
-  const [quality, setQuality] = React.useState("balanced");
-  const [previewStats, setPreviewStats] = React.useState<{
-    originalSize: string;
-    estimatedSize: string;
-  } | null>(null);
-
-  React.useEffect(() => {
-    if (imageUrl) {
-      fetch(imageUrl)
-        .then((res) => res.blob())
-        .then((blob) => {
-          const originalSize = formatFileSize(blob.size);
-          const estimatedSize = formatFileSize(
-            blob.size * getQualityMultiplier(quality)
-          );
-          setPreviewStats({ originalSize, estimatedSize });
-        });
-    }
-  }, [imageUrl, quality]);
-
-  const onCropAreaChange = React.useCallback(
-    (croppedArea: Area, croppedAreaPixels: Area) => {
-      setCroppedAreaPixels(croppedAreaPixels);
-    },
-    []
-  );
 
   const handleSave = async () => {
     if (!croppedAreaPixels) return;
-
     setIsProcessing(true);
     try {
       const { file, url } = await getCroppedImg(
         imageUrl,
         croppedAreaPixels,
-        rotation,
-        quality
+        rotation
       );
-
       onCropComplete(url, file);
       onOpenChange(false);
-      resetState();
     } catch (error) {
       toast.error("Failed to process image");
-      console.error(error);
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const resetState = () => {
-    setCrop({ x: 0, y: 0 });
-    setZoom(1);
-    setRotation(0);
-    setCroppedAreaPixels(null);
-  };
-
-  const handleCancel = () => {
-    onOpenChange(false);
-    resetState();
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[680px] p-0">
-        <DialogHeader className="p-6 pb-4">
-          <DialogTitle>Crop & Optimize Image</DialogTitle>
-          <DialogDescription>
-            Adjust your image and we'll optimize it for web use
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="p-0 w-screen h-[100svh] max-h-[100svh] rounded-none">
+        {/* Header */}
+        <div className="sticky top-0 z-30 flex items-center justify-between p-4 border-b bg-background">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => onOpenChange(false)}
+          >
+            <X className="h-5 w-5" />
+          </Button>
+          <span className="font-semibold">Crop Image</span>
+          <Button size="sm" onClick={handleSave} disabled={isProcessing}>
+            {isProcessing ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              "Done"
+            )}
+          </Button>
+        </div>
 
-        <div className="relative h-[400px] bg-muted">
+        {/* Cropper */}
+        <div className="relative flex-1 bg-black">
           <Cropper
             image={imageUrl}
             crop={crop}
             zoom={zoom}
             rotation={rotation}
-            aspect={aspectRatio}
-            cropShape={cropShape}
+            aspect={1}
+            cropShape="round"
             onCropChange={setCrop}
             onZoomChange={setZoom}
             onRotationChange={setRotation}
-            onCropComplete={onCropAreaChange}
+            onCropComplete={(_, pixels) => setCroppedAreaPixels(pixels)}
             showGrid={false}
-            style={{
-              containerStyle: {
-                background: "hsl(var(--muted))",
-              },
-            }}
           />
         </div>
 
-        <div className="space-y-4 p-6">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label className="text-sm">Zoom</Label>
-              <span className="text-sm text-muted-foreground">
-                {Math.round(zoom * 100)}%
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                size="icon"
-                variant="outline"
-                className="h-8 w-8"
-                onClick={() => setZoom(Math.max(1, zoom - 0.1))}
-              >
-                <ZoomOut className="h-3 w-3" />
-              </Button>
-              <Slider
-                value={[zoom]}
-                onValueChange={([v]) => setZoom(v)}
-                min={1}
-                max={3}
-                step={0.01}
-                className="flex-1"
-              />
-              <Button
-                size="icon"
-                variant="outline"
-                className="h-8 w-8"
-                onClick={() => setZoom(Math.min(3, zoom + 0.1))}
-              >
-                <ZoomIn className="h-3 w-3" />
-              </Button>
-            </div>
+        {/* Controls */}
+        <div className="sticky bottom-0 z-30 border-t bg-background p-4 space-y-4">
+          <div className="flex items-center gap-4">
+            <ZoomOut className="h-4 w-4 text-muted-foreground" />
+            <Slider
+              value={[zoom]}
+              onValueChange={([v]) => setZoom(v)}
+              min={1}
+              max={3}
+              step={0.01}
+              className="flex-1"
+            />
+            <ZoomIn className="h-4 w-4 text-muted-foreground" />
           </div>
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label className="text-sm">Rotation</Label>
-              <span className="text-sm text-muted-foreground">{rotation}°</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                size="icon"
-                variant="outline"
-                className="h-8 w-8"
-                onClick={() => setRotation(0)}
-              >
-                <Maximize className="h-3 w-3" />
-              </Button>
-              <Slider
-                value={[rotation]}
-                onValueChange={([v]) => setRotation(v)}
-                min={-180}
-                max={180}
-                step={1}
-                className="flex-1"
-              />
-              <Button
-                size="icon"
-                variant="outline"
-                className="h-8 w-8"
-                onClick={() => setRotation((r) => r + 90)}
-              >
-                <RotateCw className="h-3 w-3" />
-              </Button>
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            {previewStats && (
-              <div className="space-y-2">
-                <Label className="text-sm">File Size</Label>
-                <div className="rounded-md border bg-muted/50 px-3 py-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Original:</span>
-                    <span>{previewStats.originalSize}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Estimated:</span>
-                    <span className="font-medium text-green-600 dark:text-green-400">
-                      ~{previewStats.estimatedSize}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
+          <div className="flex justify-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setRotation((r) => r - 90)}
+            >
+              <RotateCw className="h-4 w-4 rotate-180" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setRotation(0)}
+            >
+              <Maximize className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setRotation((r) => r + 90)}
+            >
+              <RotateCw className="h-4 w-4" />
+            </Button>
           </div>
         </div>
-
-        <DialogFooter className="border-t p-6">
-          <Button
-            variant="outline"
-            onClick={handleCancel}
-            disabled={isProcessing}
-          >
-            Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={isProcessing}>
-            {isProcessing ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Processing...
-              </>
-            ) : (
-              <>
-                <Download className="mr-2 h-4 w-4" />
-                Save & Optimize
-              </>
-            )}
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
 
-// Utility functions
+// Utility Components
+function Card({
+  title,
+  description,
+  action,
+}: {
+  title: string;
+  description: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between rounded-lg border p-4">
+      <div className="space-y-0.5">
+        <div className="text-sm font-medium">{title}</div>
+        <div className="text-xs text-muted-foreground">{description}</div>
+      </div>
+      {action}
+    </div>
+  );
+}
+
+function ColorSwatches({
+  preview,
+}: {
+  preview: ColorPaletteConfig["preview"];
+}) {
+  return (
+    <div className="flex gap-1">
+      <div className={cn("h-4 w-4 rounded", preview.primary)} />
+      <div className={cn("h-4 w-4 rounded", preview.secondary)} />
+      <div className={cn("h-4 w-4 rounded", preview.accent)} />
+      <div className={cn("h-4 w-4 rounded", preview.background)} />
+    </div>
+  );
+}
+
+// Image processing utilities
 async function getCroppedImg(
   imageSrc: string,
   pixelCrop: Area,
-  rotation = 0,
-  quality = "balanced"
+  rotation = 0
 ): Promise<{ file: File; url: string }> {
   const image = await createImage(imageSrc);
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
-
   if (!ctx) throw new Error("No 2d context");
 
-  const maxSize = getMaxSize(quality);
+  const maxSize = 384;
   const scale = Math.min(
     1,
     maxSize / Math.max(pixelCrop.width, pixelCrop.height)
@@ -1124,18 +1234,17 @@ async function getCroppedImg(
 
   return new Promise((resolve, reject) => {
     canvas.toBlob(
-      async (blob) => {
+      (blob) => {
         if (!blob) {
           reject(new Error("Canvas is empty"));
           return;
         }
-
         const file = new File([blob], "avatar.webp", { type: "image/webp" });
         const url = URL.createObjectURL(blob);
         resolve({ file, url });
       },
       "image/webp",
-      getCompressionQuality(quality)
+      0.85
     );
   });
 }
@@ -1147,39 +1256,6 @@ function createImage(url: string): Promise<HTMLImageElement> {
     image.addEventListener("error", (error) => reject(error));
     image.src = url;
   });
-}
-
-function getMaxSize(quality: string): number {
-  switch (quality) {
-    case "high":
-      return 512;
-    case "optimized":
-      return 256;
-    default:
-      return 384;
-  }
-}
-
-function getCompressionQuality(quality: string): number {
-  switch (quality) {
-    case "high":
-      return 0.95;
-    case "optimized":
-      return 0.75;
-    default:
-      return 0.85;
-  }
-}
-
-function getQualityMultiplier(quality: string): number {
-  switch (quality) {
-    case "high":
-      return 0.7;
-    case "optimized":
-      return 0.3;
-    default:
-      return 0.5;
-  }
 }
 
 function formatFileSize(bytes: number): string {
@@ -1216,262 +1292,6 @@ function ToggleRow({
           setChecked(v);
           onChange?.(v);
         }}
-      />
-    </div>
-  );
-}
-
-function ThemeOptionButton({
-  value,
-  label,
-  Icon,
-  selected,
-  onSelect,
-}: {
-  value: ThemeChoice;
-  label: string;
-  Icon: React.ElementType;
-  selected: boolean;
-  onSelect: (v: ThemeChoice) => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={selected}
-      onClick={() => onSelect(value)}
-      className={[
-        "group relative flex min-w-0 flex-col gap-3 rounded-lg border-2 p-3 text-left",
-        "transition-all duration-200",
-        selected
-          ? "border-primary bg-primary/5 shadow-sm"
-          : "border-border hover:border-primary/40 hover:bg-muted/30",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
-      ].join(" ")}
-    >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Icon
-            className={[
-              "h-4 w-4",
-              selected ? "text-primary" : "text-muted-foreground",
-            ].join(" ")}
-          />
-          <span className="text-sm font-medium">{label}</span>
-        </div>
-        {selected && (
-          <div className="flex h-4 w-4 items-center justify-center rounded-full bg-primary">
-            <svg
-              className="h-2.5 w-2.5 text-primary-foreground"
-              fill="currentColor"
-              viewBox="0 0 12 12"
-            >
-              <path d="M3.707 5.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4a1 1 0 00-1.414-1.414L5 6.586 3.707 5.293z" />
-            </svg>
-          </div>
-        )}
-      </div>
-      <ThemePreview variant={value} />
-    </button>
-  );
-}
-
-function ThemePreview({ variant }: { variant: ThemeChoice }) {
-  if (variant === "system") {
-    return (
-      <div className="flex h-20 gap-1 rounded-md overflow-hidden">
-        <MiniPreview theme="light" className="flex-1" />
-        <MiniPreview theme="dark" className="flex-1" />
-      </div>
-    );
-  }
-  return (
-    <div className="h-20 rounded-md overflow-hidden">
-      <MiniPreview theme={variant} />
-    </div>
-  );
-}
-
-function MiniPreview({
-  theme,
-  className,
-}: {
-  theme: "light" | "dark";
-  className?: string;
-}) {
-  const isLight = theme === "light";
-
-  const colors = {
-    bg: isLight ? "bg-white" : "bg-zinc-950",
-    bgSecondary: isLight ? "bg-gray-50" : "bg-zinc-900",
-    border: isLight ? "border-gray-200" : "border-zinc-800",
-    text: isLight ? "text-gray-900" : "text-zinc-100",
-    muted: isLight ? "bg-gray-100" : "bg-zinc-800",
-    primary: isLight ? "bg-blue-600" : "bg-blue-500",
-    accent: isLight ? "bg-gray-200" : "bg-zinc-700",
-  };
-
-  return (
-    <div
-      className={[
-        "relative flex h-full w-full flex-col border",
-        colors.bg,
-        colors.border,
-        className || "",
-      ].join(" ")}
-    >
-      <div
-        className={[
-          "flex items-center gap-1 border-b px-2 py-1",
-          colors.border,
-        ].join(" ")}
-      >
-        <div className="flex gap-0.5">
-          <span className="h-1.5 w-1.5 rounded-full bg-red-400/60" />
-          <span className="h-1.5 w-1.5 rounded-full bg-amber-400/60" />
-          <span className="h-1.5 w-1.5 rounded-full bg-green-400/60" />
-        </div>
-        <div
-          className={["ml-auto h-1.5 w-8 rounded-sm", colors.muted].join(" ")}
-        />
-      </div>
-
-      <div className="flex flex-1">
-        <div
-          className={["w-8 border-r", colors.bgSecondary, colors.border].join(
-            " "
-          )}
-        >
-          <div className="space-y-1 p-1">
-            <div
-              className={["h-3 w-full rounded-sm", colors.primary].join(" ")}
-            />
-            <div
-              className={["h-3 w-full rounded-sm", colors.accent].join(" ")}
-            />
-            <div
-              className={["h-3 w-full rounded-sm", colors.accent].join(" ")}
-            />
-          </div>
-        </div>
-
-        <div className="flex-1 p-2">
-          <div className="space-y-1.5">
-            <div
-              className={["h-1.5 w-10 rounded-sm", colors.accent].join(" ")}
-            />
-            <div className="flex gap-1">
-              <div
-                className={["h-4 flex-1 rounded-sm", colors.muted].join(" ")}
-              />
-              <div
-                className={["h-4 flex-1 rounded-sm", colors.muted].join(" ")}
-              />
-            </div>
-            <div className={["h-3 w-6 rounded-sm", colors.primary].join(" ")} />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ColorPaletteOptionButton({
-  config,
-  selected,
-  onSelect,
-}: {
-  config: ColorPaletteConfig;
-  selected: boolean;
-  onSelect: () => void;
-}) {
-  const { label, icon: Icon } = config;
-
-  return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={selected}
-      aria-label={`${label} color palette`}
-      onClick={onSelect}
-      className={[
-        "group relative flex min-w-0 flex-col gap-3 rounded-lg border-2 p-4 text-left",
-        "transition-all duration-200",
-        selected
-          ? "border-primary bg-primary/5 shadow-sm"
-          : "border-border hover:border-primary/40 hover:bg-muted/30",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
-      ].join(" ")}
-    >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Icon
-            className={[
-              "h-4 w-4",
-              selected ? "text-primary" : "text-muted-foreground",
-            ].join(" ")}
-            aria-hidden="true"
-          />
-          <span className="text-sm font-medium">{label}</span>
-        </div>
-        {selected && (
-          <div className="flex h-4 w-4 items-center justify-center rounded-full bg-primary">
-            <svg
-              className="h-2.5 w-2.5 text-primary-foreground"
-              fill="currentColor"
-              viewBox="0 0 12 12"
-              aria-hidden="true"
-            >
-              <path d="M3.707 5.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4a1 1 0 00-1.414-1.414L5 6.586 3.707 5.293z" />
-            </svg>
-          </div>
-        )}
-      </div>
-      <ColorPalettePreview config={config} />
-    </button>
-  );
-}
-
-function ColorPalettePreview({ config }: { config: ColorPaletteConfig }) {
-  const { preview } = config;
-
-  return (
-    <div className="flex gap-2 p-3 rounded-md border bg-card">
-      <div className="flex flex-col gap-2 flex-1">
-        <div className="flex gap-1">
-          <div
-            className={["h-8 w-8 rounded-md", preview.primary].join(" ")}
-            title="Primary"
-            aria-label="Primary color"
-          />
-          <div
-            className={["h-8 w-8 rounded-md", preview.secondary].join(" ")}
-            title="Secondary"
-            aria-label="Secondary color"
-          />
-          <div
-            className={["h-8 w-8 rounded-md", preview.accent].join(" ")}
-            title="Accent"
-            aria-label="Accent color"
-          />
-        </div>
-        <div className="flex gap-1">
-          <div
-            className={["h-4 flex-1 rounded", preview.muted].join(" ")}
-            title="Muted"
-            aria-label="Muted color"
-          />
-          <div
-            className={["h-4 w-4 rounded", preview.foreground].join(" ")}
-            title="Text"
-            aria-label="Text color"
-          />
-        </div>
-      </div>
-      <div
-        className={["w-12 rounded-md", preview.background].join(" ")}
-        title="Background"
-        aria-label="Background color"
       />
     </div>
   );
