@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { normalizeUser } from "@/lib/normalizeUser";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { PostFeed, type Post as FeedPost } from "@/components/post-feed";
+import { UserButton } from "@/components/userButton";
 
 // Server component that renders the authenticated user's home feed.
 // Minimal, read-only implementation: fetch recent posts + author profiles.
@@ -130,7 +131,9 @@ export default async function DashboardHomePage() {
 
   // ---------------- Enrich with counts (posts / followers / following) ----------------
   // Collect unique author IDs
-  const authorIdSet = new Set<string>(finalFeed.map((p) => p.user.id).filter(Boolean));
+  const authorIdSet = new Set<string>(
+    finalFeed.map((p) => p.user.id).filter(Boolean)
+  );
   const authorIdList = Array.from(authorIdSet);
 
   if (authorIdList.length > 0) {
@@ -178,10 +181,35 @@ export default async function DashboardHomePage() {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-30 border-b bg-background/80 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <SidebarTrigger />
           <div className="text-lg font-semibold">Cookbook</div>
           <div className="text-sm text-muted-foreground truncate max-w-[180px]">
-            {user?.displayName}
+            <UserButton
+              userId={user?.id}
+              name={user?.displayName || ""}
+              email={user?.email || ""}
+              imageSrc={user?.avatarUrl ?? null}
+              size="icon"
+              className="md:hidden"
+            />
+            <p className="hidden md:block">
+              {(() => {
+                const now = new Date();
+                const time = now.toLocaleTimeString(undefined, {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  second: "2-digit",
+                  hour12: false,
+                });
+                const date = now.toLocaleDateString(undefined, {
+                  day: "2-digit",
+                  month: "2-digit",
+                });
+                const day = now.toLocaleDateString(undefined, {
+                  weekday: "short",
+                });
+                return `${time} - ${date} - ${day}`;
+              })()}
+            </p>
           </div>
         </div>
       </header>
