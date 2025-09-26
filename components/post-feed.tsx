@@ -14,10 +14,19 @@ import {
   Send,
   X,
   ArrowRight,
+  Edit,
+  Trash2,
+  Flag,
+  UserX,
+  VolumeX,
+  Link2,
+  EyeOff,
+  ChevronDown,
+  Play,
+  Pause,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import Image from "next/image";
 import { deletePosts } from "@/util/actions/postsActions";
 import {
   DropdownMenu,
@@ -25,6 +34,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { toast } from "sonner";
 import { createClient as createSupabaseClient } from "@/util/supabase/client";
 import { useRouter } from "next/navigation";
@@ -33,7 +48,6 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
-import { Arrow } from "@radix-ui/react-tooltip";
 
 /* ============================== Types =============================== */
 
@@ -77,7 +91,6 @@ export type Post = {
     model?: string;
     category?: string;
     subCategory?: string;
-    // internal UI flags used by onMore in this file
     deleted?: boolean;
     restore?: boolean;
     hidden?: boolean;
@@ -100,7 +113,6 @@ export type PostItemProps = {
   post: Post;
   dense?: boolean;
   className?: string;
-  // Optional current user's id to determine authorization for actions (e.g., Edit)
   currentUserId?: string;
 
   onLike?: (post: Post, nextLiked: boolean) => void | Promise<void>;
@@ -120,7 +132,6 @@ export type PostFeedProps = {
   className?: string;
   dense?: boolean;
   showDividers?: boolean;
-  // Optional current user's id to determine authorization for actions (e.g., Edit)
   currentUserId?: string;
 
   onLike?: PostItemProps["onLike"];
@@ -140,6 +151,17 @@ export type PostFeedProps = {
 
 /* ============================ Utilities ============================= */
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = React.useState(false);
+  React.useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+  return isMobile;
+}
+
 function initialsOf(name?: string) {
   if (!name) return "?";
   const parts = name.trim().split(/\s+/);
@@ -151,15 +173,11 @@ function initialsOf(name?: string) {
 function formatRelativeTime(dateInput: string | number | Date) {
   const d = new Date(dateInput);
   const diff = (Date.now() - d.getTime()) / 1000;
-  if (diff < 60) return "just now";
+  if (diff < 60) return "now";
   if (diff < 3600) return `${Math.floor(diff / 60)}m`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
-  if (diff < 2592000) return `${Math.floor(diff / 86400)}d`;
-  return d.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d`;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 function numberCompact(n: number | undefined) {
@@ -171,17 +189,26 @@ function Avatar({
   user,
   size = 40,
   onClick,
+  className,
 }: {
   user: PostUser;
   size?: number;
   onClick?: () => void;
+  className?: string;
 }) {
   return (
     <button
-      onClick={onClick}
-      className="relative shrink-0 inline-flex items-center justify-center rounded-full overflow-hidden bg-muted border"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick?.();
+      }}
+      className={cn(
+        "relative shrink-0 inline-flex items-center justify-center rounded-full overflow-hidden bg-muted border",
+        className
+      )}
       style={{ width: size, height: size }}
       aria-label={`${user.name}'s profile`}
+      data-stop-nav
     >
       {user.avatarUrl ? (
         <img
@@ -201,167 +228,532 @@ function Avatar({
 function TagChip({ text, onClick }: { text: string; onClick?: () => void }) {
   return (
     <button
-      onClick={onClick}
-      className="px-2.5 py-1 rounded-full text-xs border bg-muted/60 hover:bg-muted transition"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick?.();
+      }}
+      className="px-2 py-0.5 rounded-full text-xs border bg-muted/60 hover:bg-muted transition"
       aria-label={`Tag ${text}`}
-      title={`#${text}`}
+      data-stop-nav
     >
       #{text}
     </button>
   );
 }
 
-function MetaBadge({ label }: { label?: string }) {
-  if (!label) return null;
-  return (
-    <span className="px-2 py-0.5 rounded-full text-[11px] border bg-muted/50">
-      {label}
-    </span>
-  );
+/* ===================== Video Autoplay on View ===================== */
+
+function useAutoplayOnView(
+  videoRef: React.RefObject<HTMLVideoElement | null>,
+  enabled = true
+) {
+  React.useEffect(() => {
+    const el = videoRef.current;
+    if (!el || !enabled) return;
+
+    el.muted = true;
+    el.loop = true;
+    el.playsInline = true;
+
+    let playing = false;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(async (entry) => {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+            try {
+              await el.play();
+              playing = true;
+            } catch {}
+          } else if (playing) {
+            el.pause();
+            playing = false;
+          }
+        });
+      },
+      { threshold: [0.0, 0.5, 1.0] }
+    );
+
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      try {
+        el.pause();
+      } catch {}
+    };
+  }, [videoRef, enabled]);
 }
 
-function PostMediaGrid({
-  items = [],
-  onOpen,
+/* ======================== Video Player Component ======================== */
+
+function VideoPlayer({
+  src,
+  poster,
+  className,
+  autoPlayInView = true,
+  muted = true,
+  showTapOverlay = true,
+  onNavigate, // call to navigate on first tap if needed
 }: {
-  items: PostMedia[];
-  onOpen: (index: number) => void;
+  src: string;
+  poster?: string;
+  className?: string;
+  autoPlayInView?: boolean;
+  muted?: boolean;
+  showTapOverlay?: boolean;
+  onNavigate?: () => void;
 }) {
-  if (!items.length) return null;
+  const videoRef = React.useRef<HTMLVideoElement>(null);
+  const [hasInteracted, setHasInteracted] = React.useState(false);
+  const [isPlaying, setIsPlaying] = React.useState(false);
 
-  const count = items.length;
-  const base =
-    "relative w-full overflow-hidden rounded-xl border bg-muted cursor-pointer";
-  const imgCls = "w-full h-full object-cover";
-  const videoCls = "w-full h-full object-cover";
+  useAutoplayOnView(videoRef, autoPlayInView);
 
-  if (count === 1) {
-    const m = items[0];
-    const aspect =
-      m.type === "video" ? "aspect-video" : "aspect-[4/3] sm:aspect-[16/10]";
-    return (
-      <div className={cn(base, aspect)}>
-        <MediaThumb media={m} imgCls={imgCls} videoCls={videoCls} />
-        <button
-          className="absolute inset-0"
-          onClick={() => onOpen(0)}
-          aria-label="Open media"
-        />
-      </div>
-    );
-  }
+  const handleTap = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const v = videoRef.current;
+    if (!v) return;
 
-  if (count === 2) {
-    return (
-      <div className="grid grid-cols-2 gap-2">
-        {items.map((m, i) => (
-          <div key={i} className={cn(base, "aspect-[4/3] sm:aspect-[16/10]")}>
-            <MediaThumb media={m} imgCls={imgCls} videoCls={videoCls} />
-            <button
-              className="absolute inset-0"
-              onClick={() => onOpen(i)}
-              aria-label={`Open media ${i + 1}`}
-            />
-          </div>
-        ))}
-      </div>
-    );
-  }
+    // If we want navigation (e.g., on mobile), do it on the first tap
+    if (!hasInteracted && onNavigate) {
+      onNavigate();
+      return;
+    }
 
-  if (count === 3) {
-    return (
-      <div className="grid grid-cols-2 gap-2">
-        <div className={cn(base, "row-span-2 aspect-[3/4] sm:aspect-[4/5]")}>
-          <MediaThumb media={items[0]} imgCls={imgCls} videoCls={videoCls} />
-          <button
-            className="absolute inset-0"
-            onClick={() => onOpen(0)}
-            aria-label="Open media 1"
-          />
-        </div>
-        <div className={cn(base, "aspect-[4/3] sm:aspect-[16/10]")}>
-          <MediaThumb media={items[1]} imgCls={imgCls} videoCls={videoCls} />
-          <button
-            className="absolute inset-0"
-            onClick={() => onOpen(1)}
-            aria-label="Open media 2"
-          />
-        </div>
-        <div className={cn(base, "aspect-[4/3] sm:aspect-[16/10]")}>
-          <MediaThumb media={items[2]} imgCls={imgCls} videoCls={videoCls} />
-          <button
-            className="absolute inset-0"
-            onClick={() => onOpen(2)}
-            aria-label="Open media 3"
-          />
-        </div>
-      </div>
-    );
-  }
+    setHasInteracted(true);
+    v.muted = muted; // stay muted unless you implement a mute toggle
+
+    if (v.paused) {
+      v.play().catch(() => {});
+    } else {
+      v.pause();
+    }
+  };
 
   return (
-    <div className="grid grid-cols-2 gap-2">
-      {items.slice(0, 4).map((m, i) => {
-        const isLast = i === 3 && items.length > 4;
-        const extra = items.length - 4;
-        return (
-          <div key={i} className={cn(base, "aspect-[4/3] sm:aspect-[16/10]")}>
-            <MediaThumb media={m} imgCls={imgCls} videoCls={videoCls} />
-            {isLast && (
-              <div className="absolute inset-0 bg-black/40 text-white flex items-center justify-center text-lg font-medium">
-                +{extra}
-              </div>
-            )}
-            <button
-              className="absolute inset-0"
-              onClick={() => onOpen(i)}
-              aria-label={`Open media ${i + 1}`}
-            />
+    <div
+      className="relative w-full h-full group"
+      onClick={handleTap}
+      data-stop-nav
+    >
+      <video
+        ref={videoRef}
+        src={src}
+        poster={poster}
+        className={className}
+        muted={true} // keep muted for autoplay policies
+        loop
+        playsInline
+        preload="metadata"
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+      />
+      {showTapOverlay && !hasInteracted && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="p-3 rounded-full bg-black/60 backdrop-blur-sm">
+            <Play className="w-6 h-6 text-white fill-white" />
           </div>
-        );
-      })}
+        </div>
+      )}
+      {hasInteracted && (
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+          <div className="p-3 rounded-full bg-black/60 backdrop-blur-sm">
+            {isPlaying ? (
+              <Pause className="w-6 h-6 text-white fill-white" />
+            ) : (
+              <Play className="w-6 h-6 text-white fill-white" />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function MediaThumb({
-  media,
-  imgCls,
-  videoCls,
+/* ======================== Mobile Media Viewer ======================== */
+
+function MobileMediaViewer({
+  items = [],
+  initialIndex = 0,
+  open,
+  onOpenChange,
 }: {
-  media: PostMedia;
-  imgCls?: string;
-  videoCls?: string;
+  items: PostMedia[];
+  initialIndex?: number;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
-  if (media.type === "video") {
-    return (
-      <video
-        src={media.url}
-        className={videoCls}
-        preload="metadata"
-        controls={false}
-        muted
-        playsInline
-        onMouseEnter={(e) => {
-          try {
-            const v = e.currentTarget;
-            v.currentTime = 0;
-            v.play().catch(() => {});
-          } catch {}
-        }}
-        onMouseLeave={(e) => {
-          try {
-            e.currentTarget.pause();
-          } catch {}
-        }}
-        poster={media.posterUrl}
-      />
-    );
-  }
-  return <img src={media.url} alt={media.alt ?? ""} className={imgCls} />;
+  const [index, setIndex] = React.useState(initialIndex);
+  const [startX, setStartX] = React.useState(0);
+
+  React.useEffect(() => {
+    setIndex(initialIndex);
+  }, [initialIndex]);
+
+  React.useEffect(() => {
+    if (!open) return;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [open]);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setStartX(e.touches[0].clientX);
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const endX = e.changedTouches[0].clientX;
+    const diff = endX - startX;
+    if (Math.abs(diff) > 50) {
+      if (diff > 0 && index > 0) setIndex(index - 1);
+      else if (diff < 0 && index < items.length - 1) setIndex(index + 1);
+    }
+  };
+
+  if (!open || !items.length) return null;
+
+  const current = items[index];
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black">
+      <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-4 bg-gradient-to-b from-black/60 to-transparent">
+        <button
+          onClick={() => onOpenChange(false)}
+          className="p-2 rounded-full bg-white/10 backdrop-blur"
+        >
+          <X className="w-5 h-5 text-white" />
+        </button>
+        <span className="text-white text-sm font-medium">
+          {index + 1} / {items.length}
+        </span>
+      </div>
+
+      <div
+        className="relative w-full h-full flex items-center justify-center"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        {current.type === "image" ? (
+          <img
+            src={current.url}
+            alt={current.alt ?? ""}
+            className="w-full h-full object-contain"
+          />
+        ) : (
+          <video
+            src={current.url}
+            poster={current.posterUrl}
+            className="w-full h-full object-contain"
+            controls
+            autoPlay
+            playsInline
+            muted
+          />
+        )}
+      </div>
+
+      {items.length > 1 && (
+        <div className="absolute bottom-safe left-0 right-0 flex justify-center gap-1.5 pb-4">
+          {items.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setIndex(i)}
+              className={cn(
+                "w-1.5 h-1.5 rounded-full transition-all",
+                i === index ? "w-6 bg-white" : "bg-white/50"
+              )}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
-function PostDetailDialog({
+/* ======================= Mobile Post Detail ======================== */
+
+function MobilePostDetail({
+  post,
+  open,
+  onOpenChange,
+  fetchComments,
+  onSubmitComment,
+  onLike,
+  onShare,
+  onSave,
+}: {
+  post: Post;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  fetchComments?: (post: Post) => Promise<PostComment[]>;
+  onSubmitComment?: (post: Post, text: string) => Promise<PostComment | void>;
+  onLike?: (post: Post, nextLiked: boolean) => void | Promise<void>;
+  onShare?: (post: Post) => void;
+  onSave?: (post: Post, nextSaved: boolean) => void | Promise<void>;
+}) {
+  const [liked, setLiked] = React.useState(Boolean(post.liked));
+  const [saved, setSaved] = React.useState(Boolean(post.saved));
+  const [stats, setStats] = React.useState(
+    post.stats ?? { likes: 0, comments: 0, shares: 0 }
+  );
+  const [comments, setComments] = React.useState<PostComment[] | null>(
+    post.comments ?? null
+  );
+  const [loadingComments, setLoadingComments] = React.useState(false);
+  const [reply, setReply] = React.useState("");
+  const [mediaViewerOpen, setMediaViewerOpen] = React.useState(false);
+  const [mediaIndex, setMediaIndex] = React.useState(0);
+
+  React.useEffect(() => {
+    if (open && !comments && fetchComments) {
+      setLoadingComments(true);
+      fetchComments(post)
+        .then((res) => setComments(res))
+        .catch(() => setComments([]))
+        .finally(() => setLoadingComments(false));
+    }
+  }, [open, comments, fetchComments, post]);
+
+  const handleLike = async () => {
+    const next = !liked;
+    setLiked(next);
+    setStats((s) => ({ ...s, likes: s.likes + (next ? 1 : -1) }));
+    try {
+      await onLike?.(post, next);
+    } catch {
+      setLiked(!next);
+      setStats((s) => ({ ...s, likes: s.likes + (next ? -1 : 1) }));
+    }
+  };
+
+  const handleSave = async () => {
+    const next = !saved;
+    setSaved(next);
+    try {
+      await onSave?.(post, next);
+    } catch {
+      setSaved(!next);
+    }
+  };
+
+  const handleSubmitReply = async () => {
+    const text = reply.trim();
+    if (!text) return;
+    setReply("");
+    const optimistic: PostComment = {
+      id: `local-${Date.now()}`,
+      user: post.user,
+      text,
+      createdAt: Date.now(),
+    };
+    setComments((c) => [optimistic, ...(c ?? [])]);
+    setStats((s) => ({ ...s, comments: s.comments + 1 }));
+    try {
+      const created = await onSubmitComment?.(post, text);
+      if (created) {
+        setComments((c) =>
+          (c ?? []).map((cm) => (cm.id === optimistic.id ? created : cm))
+        );
+      }
+    } catch {}
+  };
+
+  const openMedia = (index: number) => {
+    setMediaIndex(index);
+    setMediaViewerOpen(true);
+  };
+
+  return (
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent
+          side="bottom"
+          className="h-[85vh] rounded-t-2xl p-0 flex flex-col"
+        >
+          <div className="sticky top-0 z-10 bg-background border-b">
+            <div className="flex items-center justify-between p-4">
+              <div className="flex items-center gap-3">
+                <Avatar user={post.user} size={36} />
+                <div>
+                  <div className="flex items-center gap-1">
+                    <span className="font-semibold text-sm">
+                      {post.user.name}
+                    </span>
+                    {post.user.verified && (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    @{post.user.username} · {formatRelativeTime(post.createdAt)}
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => onOpenChange(false)}>
+                <ChevronDown className="w-5 h-5 text-muted-foreground" />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto">
+            <div className="p-4 space-y-4">
+              {post.text && (
+                <p className="text-[15px] leading-relaxed">{post.text}</p>
+              )}
+
+              {post.attachments && post.attachments.length > 0 && (
+                <div className="grid grid-cols-2 gap-2">
+                  {post.attachments.slice(0, 4).map((media, i) => (
+                    <div
+                      key={i}
+                      className="relative aspect-square rounded-lg overflow-hidden bg-black"
+                    >
+                      {media.type === "image" ? (
+                        <button
+                          onClick={() => openMedia(i)}
+                          className="w-full h-full"
+                          data-stop-nav
+                        >
+                          <img
+                            src={media.url}
+                            alt={media.alt ?? ""}
+                            className="w-full h-full object-cover"
+                          />
+                        </button>
+                      ) : (
+                        <VideoPlayer
+                          src={media.url}
+                          poster={media.posterUrl}
+                          className="w-full h-full object-cover"
+                          onNavigate={() => openMedia(i)}
+                        />
+                      )}
+                      {i === 3 && (post.attachments?.length ?? 0) > 4 && (
+                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                          <span className="text-white text-xl font-semibold">
+                            +{(post.attachments?.length ?? 0) - 4}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {post.tags && post.tags.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {post.tags.map((tag, i) => (
+                    <TagChip key={i} text={tag} />
+                  ))}
+                </div>
+              )}
+
+              <div className="flex items-center justify-around py-3 border-y">
+                <button
+                  onClick={handleLike}
+                  className={cn(
+                    "flex flex-col items-center gap-1",
+                    liked && "text-primary"
+                  )}
+                  data-stop-nav
+                >
+                  <Heart className={cn("w-6 h-6", liked && "fill-current")} />
+                  <span className="text-xs">{numberCompact(stats.likes)}</span>
+                </button>
+                <div className="flex flex-col items-center gap-1" data-stop-nav>
+                  <MessageCircle className="w-6 h-6" />
+                  <span className="text-xs">
+                    {numberCompact(stats.comments)}
+                  </span>
+                </div>
+                <button
+                  onClick={() => {
+                    setStats((s) => ({ ...s, shares: s.shares + 1 }));
+                    onShare?.(post);
+                  }}
+                  className="flex flex-col items-center gap-1"
+                  data-stop-nav
+                >
+                  <Share2 className="w-6 h-6" />
+                  <span className="text-xs">{numberCompact(stats.shares)}</span>
+                </button>
+                <button
+                  onClick={handleSave}
+                  className={cn(
+                    "flex flex-col items-center gap-1",
+                    saved && "text-primary"
+                  )}
+                  data-stop-nav
+                >
+                  <Bookmark
+                    className={cn("w-6 h-6", saved && "fill-current")}
+                  />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="font-semibold text-sm">Comments</h3>
+                {loadingComments ? (
+                  <p className="text-sm text-muted-foreground">Loading...</p>
+                ) : comments && comments.length > 0 ? (
+                  <div className="space-y-3">
+                    {comments.map((c) => (
+                      <div key={c.id} className="flex gap-3">
+                        <Avatar user={c.user} size={32} />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 text-xs">
+                            <span className="font-semibold">{c.user.name}</span>
+                            <span className="text-muted-foreground">
+                              {formatRelativeTime(c.createdAt)}
+                            </span>
+                          </div>
+                          <p className="text-sm mt-1">{c.text}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No comments yet
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="sticky bottom-0 border-t bg-background p-4">
+            <div className="flex gap-2">
+              <Textarea
+                value={reply}
+                onChange={(e) => setReply(e.target.value)}
+                placeholder="Add a comment..."
+                className="min-h-[40px] resize-none"
+                rows={1}
+              />
+              <Button
+                onClick={handleSubmitReply}
+                disabled={!reply.trim()}
+                size="icon"
+              >
+                <Send className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <MobileMediaViewer
+        items={post.attachments ?? []}
+        initialIndex={mediaIndex}
+        open={mediaViewerOpen}
+        onOpenChange={setMediaViewerOpen}
+      />
+    </>
+  );
+}
+
+/* ======================== Desktop Post Detail ======================== */
+
+function DesktopPostDetail({
   post,
   open,
   onOpenChange,
@@ -395,9 +787,7 @@ function PostDetailDialog({
   const [reply, setReply] = React.useState("");
   const attachments = post.attachments ?? [];
 
-  React.useEffect(() => {
-    setMediaIndex(initialIndex);
-  }, [initialIndex]);
+  React.useEffect(() => setMediaIndex(initialIndex), [initialIndex]);
 
   React.useEffect(() => {
     if (open && !comments && fetchComments) {
@@ -411,19 +801,17 @@ function PostDetailDialog({
 
   React.useEffect(() => {
     if (!open) return;
-    const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
-      document.body.style.overflow = prev;
+      document.body.style.overflow = "";
     };
   }, [open]);
 
   React.useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onOpenChange(false);
-      } else if (e.key === "ArrowLeft" && attachments.length > 1) {
+      if (e.key === "Escape") onOpenChange(false);
+      else if (e.key === "ArrowLeft" && attachments.length > 1) {
         setMediaIndex((i) => (i === 0 ? attachments.length - 1 : i - 1));
       } else if (e.key === "ArrowRight" && attachments.length > 1) {
         setMediaIndex((i) => (i === attachments.length - 1 ? 0 : i + 1));
@@ -459,45 +847,38 @@ function PostDetailDialog({
     const text = reply.trim();
     if (!text) return;
     setReply("");
-    const newComment: PostComment = {
+    const optimistic: PostComment = {
       id: `local-${Date.now()}`,
-      user: post.user, // replace with current user if available
+      user: post.user,
       text,
       createdAt: Date.now(),
     };
-    setComments((c) => [newComment, ...(c ?? [])]);
+    setComments((c) => [optimistic, ...(c ?? [])]);
     setStats((s) => ({ ...s, comments: s.comments + 1 }));
     try {
       const created = await onSubmitComment?.(post, text);
-      if (created) {
+      if (created)
         setComments((c) =>
-          (c ?? []).map((cm) => (cm.id === newComment.id ? created : cm))
+          (c ?? []).map((cm) => (cm.id === optimistic.id ? created : cm))
         );
-      }
-    } catch {
-      // ignore; optimistic only
-    }
+    } catch {}
   };
 
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/60 backdrop-blur-xl">
-      {/* Backdrop */}
       <div className="absolute inset-0" onClick={() => onOpenChange(false)} />
 
-      {/* Modal */}
       <div
         className="relative w-[92vw] max-w-7xl h-[88vh] bg-card rounded-2xl overflow-hidden flex shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Left: Media */}
-        <div className="relative flex-1 flex items-center justify-center">
+        <div className="relative flex-1 flex items-center justify-center bg-black">
           {attachments.length > 0 ? (
             <>
               {attachments[mediaIndex].type === "image" ? (
-                <Image
-                  fill
+                <img
                   src={attachments[mediaIndex].url}
                   alt={attachments[mediaIndex].alt ?? ""}
                   className="object-contain w-full h-full"
@@ -505,39 +886,39 @@ function PostDetailDialog({
               ) : (
                 <video
                   src={attachments[mediaIndex].url}
+                  poster={attachments[mediaIndex].posterUrl}
                   className="object-contain w-full h-full"
                   controls
                   autoPlay
+                  playsInline
+                  muted
+                  loop
                 />
               )}
 
-              {/* Navigation */}
               {attachments.length > 1 && (
                 <>
                   <button
-                    className="absolute left-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+                    className="absolute left-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white"
                     onClick={() =>
                       setMediaIndex((i) =>
                         i === 0 ? attachments.length - 1 : i - 1
                       )
                     }
-                    aria-label="Previous"
                   >
                     <ChevronLeft className="w-6 h-6" />
                   </button>
                   <button
-                    className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white"
                     onClick={() =>
                       setMediaIndex((i) =>
                         i === attachments.length - 1 ? 0 : i + 1
                       )
                     }
-                    aria-label="Next"
                   >
                     <ChevronRight className="w-6 h-6" />
                   </button>
 
-                  {/* Dots indicator */}
                   <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
                     {attachments.map((_, i) => (
                       <button
@@ -549,7 +930,6 @@ function PostDetailDialog({
                             ? "w-6 bg-white"
                             : "bg-white/50 hover:bg-white/70"
                         )}
-                        aria-label={`Go to media ${i + 1}`}
                       />
                     ))}
                   </div>
@@ -579,72 +959,38 @@ function PostDetailDialog({
             </div>
             <button
               onClick={() => onOpenChange(false)}
-              className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-muted transition-colors group"
+              className="p-2 rounded-full hover:bg-muted"
             >
-              <X className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+              <X className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Content */}
           <div className="flex-1 overflow-y-auto">
-            {/* Post content */}
             <div className="p-6 space-y-4 border-b">
               {post.text && (
                 <p className="text-[15px] leading-relaxed">{post.text}</p>
               )}
 
-              {(post.meta?.model ||
-                post.meta?.category ||
-                post.meta?.subCategory) && (
-                <div className="pt-2">
-                  <p className="text-[10px] font-medium tracking-wider text-muted-foreground mb-2">
-                    DETAILS
-                  </p>
-                  <div className="space-y-1">
-                    {post.meta?.model && (
-                      <p className="text-sm">
-                        <span className="text-muted-foreground">Model:</span>{" "}
-                        {post.meta.model}
-                      </p>
-                    )}
-                    {(post.meta?.category || post.meta?.subCategory) && (
-                      <p className="text-sm">
-                        <span className="text-muted-foreground">Category:</span>{" "}
-                        {post.meta?.category}
-                        {post.meta?.subCategory &&
-                          ` → ${post.meta.subCategory}`}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-
               {post.tags && post.tags.length > 0 && (
-                <div className="flex flex-wrap gap-2 pt-2">
+                <div className="flex flex-wrap gap-2">
                   {post.tags.map((t, i) => (
-                    <span
-                      key={i}
-                      className="px-2.5 py-1 rounded-full text-xs border bg-muted/60"
-                    >
-                      #{t}
-                    </span>
+                    <TagChip key={i} text={t} />
                   ))}
                 </div>
               )}
 
-              {/* Actions */}
-              <div className="flex items-center gap-4 pt-2 text-sm text-muted-foreground">
+              <div className="flex items-center gap-4 pt-2">
                 <button
                   onClick={handleLike}
                   className={cn(
-                    "inline-flex items-center gap-2 hover:text-foreground transition-colors",
+                    "flex items-center gap-2",
                     liked && "text-primary"
                   )}
                 >
                   <Heart className={cn("w-5 h-5", liked && "fill-current")} />
                   <span>{numberCompact(stats.likes)}</span>
                 </button>
-                <div className="inline-flex items-center gap-2">
+                <div className="flex items-center gap-2">
                   <MessageCircle className="w-5 h-5" />
                   <span>{numberCompact(stats.comments)}</span>
                 </div>
@@ -653,17 +999,14 @@ function PostDetailDialog({
                     setStats((s) => ({ ...s, shares: s.shares + 1 }));
                     onShare?.(post);
                   }}
-                  className="inline-flex items-center gap-2 hover:text-foreground transition-colors"
+                  className="flex items-center gap-2"
                 >
                   <Share2 className="w-5 h-5" />
                   <span>{numberCompact(stats.shares)}</span>
                 </button>
                 <button
                   onClick={handleSave}
-                  className={cn(
-                    "ml-auto inline-flex items-center gap-2 hover:text-foreground transition-colors",
-                    saved && "text-primary"
-                  )}
+                  className={cn("ml-auto", saved && "text-primary")}
                 >
                   <Bookmark
                     className={cn("w-5 h-5", saved && "fill-current")}
@@ -672,30 +1015,23 @@ function PostDetailDialog({
               </div>
             </div>
 
-            {/* Comments */}
             <div className="p-6">
-              <p className="text-[10px] font-medium tracking-wider text-muted-foreground mb-4">
-                COMMENTS
-              </p>
+              <h4 className="font-semibold mb-4">Comments</h4>
               {loadingComments ? (
-                <div className="text-sm text-muted-foreground">
-                  Loading comments…
-                </div>
+                <p className="text-sm text-muted-foreground">Loading...</p>
               ) : comments && comments.length > 0 ? (
                 <div className="space-y-4">
                   {comments.map((c) => (
-                    <div key={c.id} className="flex items-start gap-3">
+                    <div key={c.id} className="flex gap-3">
                       <Avatar user={c.user} size={32} />
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1">
                         <div className="flex items-center gap-2 text-sm">
                           <span className="font-medium">{c.user.name}</span>
                           <span className="text-muted-foreground">
-                            • {formatRelativeTime(c.createdAt)}
+                            {formatRelativeTime(c.createdAt)}
                           </span>
                         </div>
-                        <p className="mt-1 text-[14px] leading-relaxed">
-                          {c.text}
-                        </p>
+                        <p className="text-sm mt-1">{c.text}</p>
                       </div>
                     </div>
                   ))}
@@ -706,14 +1042,13 @@ function PostDetailDialog({
             </div>
           </div>
 
-          {/* Reply composer */}
-          <div className="p-6 border-t mt-auto">
-            <div className="flex items-end gap-2">
+          <div className="p-6 border-t">
+            <div className="flex gap-2">
               <Textarea
                 value={reply}
                 onChange={(e) => setReply(e.target.value)}
-                placeholder="Write a reply…"
-                className="min-h-[44px] max-h-32 resize-none"
+                placeholder="Write a reply..."
+                className="min-h-[44px] resize-none"
               />
               <Button
                 onClick={handleSubmitReply}
@@ -729,6 +1064,138 @@ function PostDetailDialog({
     </div>
   );
 }
+
+/* ======================== Mobile Actions Menu ======================== */
+
+function MobileActionsMenu({
+  post,
+  isAuthor,
+  open,
+  onOpenChange,
+  onEdit,
+  onDelete,
+  onShare,
+  onCopyLink,
+  onNotInterested,
+  onMute,
+  onBlock,
+  onReport,
+}: {
+  post: Post;
+  isAuthor: boolean;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  onShare?: () => void;
+  onCopyLink?: () => void;
+  onNotInterested?: () => void;
+  onMute?: () => void;
+  onBlock?: () => void;
+  onReport?: () => void;
+}) {
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="bottom" className="rounded-t-2xl">
+        <SheetHeader>
+          <SheetTitle>Post Options</SheetTitle>
+        </SheetHeader>
+        <div className="grid gap-2 py-4">
+          {isAuthor ? (
+            <>
+              <Button
+                variant="ghost"
+                className="justify-start"
+                onClick={onEdit}
+                data-stop-nav
+              >
+                <Edit className="mr-2 h-4 w-4" />
+                Edit Post
+              </Button>
+              <Button
+                variant="ghost"
+                className="justify-start"
+                onClick={onShare}
+                data-stop-nav
+              >
+                <Share2 className="mr-2 h-4 w-4" />
+                Share Post
+              </Button>
+              <Button
+                variant="ghost"
+                className="justify-start text-destructive"
+                onClick={onDelete}
+                data-stop-nav
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete Post
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="ghost"
+                className="justify-start"
+                onClick={onShare}
+                data-stop-nav
+              >
+                <Share2 className="mr-2 h-4 w-4" />
+                Share Post
+              </Button>
+              <Button
+                variant="ghost"
+                className="justify-start"
+                onClick={onCopyLink}
+                data-stop-nav
+              >
+                <Link2 className="mr-2 h-4 w-4" />
+                Copy Link
+              </Button>
+              <Button
+                variant="ghost"
+                className="justify-start"
+                onClick={onNotInterested}
+                data-stop-nav
+              >
+                <EyeOff className="mr-2 h-4 w-4" />
+                Not Interested
+              </Button>
+              <Button
+                variant="ghost"
+                className="justify-start"
+                onClick={onMute}
+                data-stop-nav
+              >
+                <VolumeX className="mr-2 h-4 w-4" />
+                Mute @{post.user.username}
+              </Button>
+              <Button
+                variant="ghost"
+                className="justify-start text-destructive"
+                onClick={onBlock}
+                data-stop-nav
+              >
+                <UserX className="mr-2 h-4 w-4" />
+                Block @{post.user.username}
+              </Button>
+              <Button
+                variant="ghost"
+                className="justify-start text-destructive"
+                onClick={onReport}
+                data-stop-nav
+              >
+                <Flag className="mr-2 h-4 w-4" />
+                Report Post
+              </Button>
+            </>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+/* ========================== Post Item Component ======================== */
 
 export function PostItem({
   post,
@@ -746,21 +1213,21 @@ export function PostItem({
   onSubmitComment,
 }: PostItemProps) {
   const router = useRouter();
+  const isMobile = useIsMobile();
   const [liked, setLiked] = React.useState(Boolean(post.liked));
   const [saved, setSaved] = React.useState(Boolean(post.saved));
   const [stats, setStats] = React.useState(
     post.stats ?? { likes: 0, comments: 0, shares: 0 }
   );
-  const attachments = post.attachments ?? [];
   const [expanded, setExpanded] = React.useState(false);
+  const [detailOpen, setDetailOpen] = React.useState(false);
+  const [detailIndex, setDetailIndex] = React.useState(0);
+  const [actionsOpen, setActionsOpen] = React.useState(false);
+  const [mediaViewerOpen, setMediaViewerOpen] = React.useState(false);
+  const [mediaIndex, setMediaIndex] = React.useState(0);
 
-  // Detail dialog
-  const [open, setOpen] = React.useState(false);
-  const [openIndex, setOpenIndex] = React.useState(0);
-  const openViewer = (i: number) => {
-    setOpenIndex(i);
-    setOpen(true);
-  };
+  const isAuthor = currentUserId === post.user.id;
+  const postUrl = `/home/posts/${post.id}`;
 
   const handleLike = async () => {
     const next = !liked;
@@ -784,14 +1251,7 @@ export function PostItem({
     }
   };
 
-  const isAuthor = currentUserId === post.user.id;
-
-  const postUrl =
-    typeof window !== "undefined"
-      ? `${window.location.origin}/posts/${post.id}`
-      : `/posts/${post.id}`;
-
-  const handleShareMenu = async () => {
+  const handleShare = async () => {
     try {
       setStats((s) => ({ ...s, shares: s.shares + 1 }));
       if (navigator?.share) {
@@ -802,7 +1262,7 @@ export function PostItem({
         });
       } else if (navigator?.clipboard?.writeText) {
         await navigator.clipboard.writeText(postUrl);
-        toast.success("Link copied to clipboard");
+        toast.success("Link copied");
       }
       onShare?.(post);
     } catch {}
@@ -810,321 +1270,315 @@ export function PostItem({
 
   const handleCopyLink = async () => {
     try {
-      if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(postUrl);
-        toast.success("Link copied to clipboard");
-      } else {
-        toast.error("Clipboard is not available");
-      }
+      await navigator.clipboard.writeText(postUrl);
+      toast.success("Link copied");
     } catch {
       toast.error("Could not copy link");
     }
   };
 
-  const handleReportMenu = () => {
-    onMore?.({
-      ...post,
-      meta: { ...(post.meta || {}), reported: true },
-    });
-    toast.success("Thanks for your report. Our team will review it.");
-  };
-
-  const handleNotInterestedMenu = () => {
-    onMore?.({
-      ...post,
-      meta: { ...(post.meta || {}), hidden: true, notInterested: true },
-    });
-    toast("We'll show you fewer posts like this");
-  };
-
-  const handleMuteMenu = () => {
-    onMore?.({
-      ...post,
-      meta: { ...(post.meta || {}), muteUserId: post.user.id },
-    });
-    toast(
-      `Muted ${post.user.username ? `@${post.user.username}` : post.user.name}`
-    );
-  };
-
-  const handleBlockMenu = () => {
-    onMore?.({
-      ...post,
-      meta: { ...(post.meta || {}), blockUserId: post.user.id },
-    });
-    toast.success(
-      `Blocked ${
-        post.user.username ? `@${post.user.username}` : post.user.name
-      }`
-    );
-  };
-
-  const handleDeleteMenu = async () => {
-    onMore?.({
-      ...post,
-      meta: { ...(post.meta || {}), deleted: true },
-    });
-
+  const handleDelete = async () => {
+    onMore?.({ ...post, meta: { ...post.meta, deleted: true } });
     try {
       const res = await deletePosts(post.id);
-      if (!res?.ok) {
-        throw new Error(res?.error || "Failed to delete post");
-      }
-      toast.success("Post deleted successfully");
-    } catch (e: any) {
-      // Restore on failure
-      onMore?.({
-        ...post,
-        meta: { ...(post.meta || {}), restore: true },
-      });
-      toast.error(e?.message || "Could not delete post");
+      if (!res?.ok) throw new Error(res?.error || "Failed");
+      toast.success("Post deleted");
+    } catch (e) {
+      onMore?.({ ...post, meta: { ...post.meta, restore: true } });
+      toast.error("Could not delete post");
     }
   };
 
+  const openMediaViewer = (index: number) => {
+    if (isMobile) {
+      // For mobile: navigate to dedicated post page instead of in-feed viewer
+      router.push(postUrl);
+    } else {
+      setDetailIndex(index);
+      setDetailOpen(true);
+    }
+  };
+
+  const handleContainerClickCapture = (e: React.MouseEvent) => {
+    // Prevent navigation when clicking on interactive elements
+    const target = e.target as HTMLElement;
+    const interactive = target.closest(
+      'a, button, input, textarea, select, label, [role="button"], [data-stop-nav]'
+    );
+    if (interactive) return;
+
+    // On mobile: navigate to the post page.
+    // On larger screens: clicking outside media should also navigate to the post page.
+    // Media elements themselves call onOpen(...) and stop propagation to open the dialog.
+    router.push(postUrl);
+  };
+
+  const handleContainerKeyDown = (e: React.KeyboardEvent) => {
+    if ((e.key === "Enter" || e.key === " ") && isMobile) {
+      e.preventDefault();
+      e.stopPropagation();
+      router.push(postUrl);
+    }
+  };
+
+  const avatarSize = isMobile ? 36 : 40;
+
   return (
     <>
-      <article className={cn("w-full", dense ? "py-4" : "py-6", className)}>
-        <div className="flex items-start gap-3">
-          <Avatar user={post.user} onClick={() => onUserClick?.(post.user)} />
+      <article
+        className={cn(
+          "w-full",
+          dense ? "py-3" : isMobile ? "py-4" : "py-6",
+          className,
+          "cursor-pointer"
+        )}
+        onClickCapture={handleContainerClickCapture}
+        onKeyDown={handleContainerKeyDown}
+        tabIndex={0}
+        aria-label={`Open post by ${post.user.name}`}
+      >
+        <div className={cn("flex gap-3", isMobile && "gap-2")}>
+          <Avatar
+            user={post.user}
+            size={avatarSize}
+            onClick={() => onUserClick?.(post.user)}
+          />
 
           <div className="flex-1 min-w-0">
             {/* Header */}
             <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2 text-sm flex-wrap min-w-0">
-                <HoverCard openDelay={150} closeDelay={100}>
-                  <HoverCardTrigger asChild>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onUserClick?.(post.user);
-                      }}
-                      className="group relative font-medium text-foreground transition-colors duration-200 hover:text-primary hover:underline focus:outline-none"
-                      aria-label={`View profile of ${post.user.name}`}
-                    >
-                      {post.user.name}
-                    </button>
-                  </HoverCardTrigger>
-
-                  <HoverCardContent
-                    className="w-80 p-0 overflow-hidden border border-border/60 backdrop-blur-md bg-card/95 shadow-xl rounded-xl animate-in fade-in-50 zoom-in-95"
-                    sideOffset={8}
-                    align="start"
+              <div className="flex items-center gap-1 text-sm flex-wrap min-w-0">
+                {isMobile ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onUserClick?.(post.user);
+                    }}
+                    className="font-semibold"
+                    data-stop-nav
                   >
-                    {/* Gradient Header Accent */}
-                    <div className="h-1 bg-gradient-to-r from-primary/30 to-transparent" />
-
-                    <div className="p-4 space-y-3">
-                      {/* Avatar + Info Row */}
-                      <div className="flex items-start gap-3">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onUserClick?.(post.user);
-                          }}
-                          className="shrink-0 transition-transform hover:scale-105 active:scale-95"
-                          aria-label={`Visit ${post.user.name}'s profile`}
-                        >
-                          <Avatar user={post.user} size={42} />
-                        </button>
-
-                        <div className="min-w-0 flex-1 space-y-1">
-                          <div className="flex items-center gap-2">
-                            <h4 className="text-base font-semibold truncate leading-tight">
-                              {post.user.name}
-                            </h4>
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                              @{post.user.username}
-                            </span>
-                          </div>
-
-                          <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3 max-h-[4.5rem]">
+                    {post.user.name}
+                  </button>
+                ) : (
+                  <HoverCard openDelay={150} closeDelay={100}>
+                    <HoverCardTrigger asChild>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onUserClick?.(post.user);
+                        }}
+                        className="font-semibold hover:underline"
+                        data-stop-nav
+                      >
+                        {post.user.name}
+                      </button>
+                    </HoverCardTrigger>
+                    <HoverCardContent className="w-80">
+                      <div className="flex gap-3">
+                        <Avatar user={post.user} size={42} />
+                        <div className="flex-1">
+                          <h4 className="font-semibold">{post.user.name}</h4>
+                          <p className="text-sm text-muted-foreground">
+                            @{post.user.username}
+                          </p>
+                          <p className="text-sm mt-2">
                             {post.user.bio || "No bio yet."}
                           </p>
                         </div>
                       </div>
-
-                      <div className="flex justify-between text-xs text-muted-foreground pt-2 border-t border-border/40">
-                        <span>Posts: {post.user.postsCount ?? 0}</span>
-                        <span>Followers: {post.user.followersCount ?? 0}</span>
-                        <span>Following: {post.user.followingCount ?? 0}</span>
-                      </div>
-
-                      <button
+                      <Button
+                        className="mt-3 w-full"
                         onClick={(e) => {
                           e.stopPropagation();
-                          router.push(`/home/profile/${post.user.username}`);
+                          onUserClick?.(post.user);
                         }}
-                        className="w-full mt-1 py-2 text-sm font-medium text-primary hover:bg-primary/5 active:bg-primary/10 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
-                        aria-label={`Go to ${post.user.name}'s profile`}
+                        data-stop-nav
                       >
-                        <span>View Profile</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </HoverCardContent>
-                </HoverCard>
+                        View Profile
+                        <ArrowRight className="ml-2 w-4 h-4" />
+                      </Button>
+                    </HoverCardContent>
+                  </HoverCard>
+                )}
                 {post.user.verified && (
-                  <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
+                  <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
                 )}
-                {post.user.username && (
-                  <span className="text-muted-foreground">
-                    @{post.user.username}
-                  </span>
-                )}
-                <span className="text-muted-foreground">·</span>
-                <time
-                  className="text-muted-foreground"
-                  title={new Date(post.createdAt).toLocaleString()}
-                >
-                  {formatRelativeTime(post.createdAt)}
-                </time>
+                <span className="text-muted-foreground text-xs">
+                  @{post.user.username} · {formatRelativeTime(post.createdAt)}
+                </span>
               </div>
 
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    className="p-1 rounded hover:bg-muted shrink-0"
-                    aria-label="More"
-                    title="More"
-                  >
-                    <MoreHorizontal className="w-4 h-4" />
-                  </button>
-                </DropdownMenuTrigger>
-
-                <DropdownMenuContent align="end" className="min-w-44">
-                  {isAuthor ? (
-                    <>
-                      <DropdownMenuItem onClick={() => onMore?.(post)}>
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleShareMenu}>
-                        Share
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        variant="destructive"
-                        onClick={handleDeleteMenu}
-                      >
-                        Delete
-                      </DropdownMenuItem>
-                    </>
-                  ) : (
-                    <>
-                      <DropdownMenuItem onClick={handleShareMenu}>
-                        Share
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleCopyLink}>
-                        Copy link
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleNotInterestedMenu}>
-                        Not interested
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleMuteMenu}>
-                        Mute{" "}
-                        {post.user.username
-                          ? `@${post.user.username}`
-                          : post.user.name}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        variant="destructive"
-                        onClick={handleBlockMenu}
-                      >
-                        Block{" "}
-                        {post.user.username
-                          ? `@${post.user.username}`
-                          : post.user.name}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        variant="destructive"
-                        onClick={handleReportMenu}
-                      >
-                        Report
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {isMobile ? (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActionsOpen(true);
+                  }}
+                  className="p-1.5 -mr-1.5"
+                  data-stop-nav
+                >
+                  <MoreHorizontal className="w-4 h-4" />
+                </button>
+              ) : (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className="p-1 rounded hover:bg-muted"
+                      data-stop-nav
+                    >
+                      <MoreHorizontal className="w-4 h-4" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {isAuthor ? (
+                      <>
+                        <DropdownMenuItem onClick={() => onMore?.(post)}>
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={handleShare}>
+                          Share
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          variant="destructive"
+                          onClick={handleDelete}
+                        >
+                          Delete
+                        </DropdownMenuItem>
+                      </>
+                    ) : (
+                      <>
+                        <DropdownMenuItem onClick={handleShare}>
+                          Share
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={handleCopyLink}>
+                          Copy link
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            onMore?.({
+                              ...post,
+                              meta: { ...post.meta, notInterested: true },
+                            })
+                          }
+                        >
+                          Not interested
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          variant="destructive"
+                          onClick={() =>
+                            onMore?.({
+                              ...post,
+                              meta: { ...post.meta, reported: true },
+                            })
+                          }
+                        >
+                          Report
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
 
-            {/* Meta badges */}
-            {(post.meta?.model ||
-              post.meta?.category ||
-              post.meta?.subCategory) && (
-              <div className="mt-1 flex flex-wrap items-center gap-2">
-                <MetaBadge label={post.meta?.model} />
-                <MetaBadge label={post.meta?.category} />
-                <MetaBadge label={post.meta?.subCategory} />
-              </div>
-            )}
-
-            {/* Text */}
+            {/* Content */}
             {post.text && (
-              <div className="mt-2 whitespace-pre-wrap text-[15px] leading-6">
-                {!expanded && post.text.length > 250
-                  ? `${post.text.slice(0, 250)}…`
+              <div
+                className={cn(
+                  "mt-2 whitespace-pre-wrap",
+                  isMobile
+                    ? "text-[14px] leading-relaxed"
+                    : "text-[15px] leading-6"
+                )}
+              >
+                {!expanded && post.text.length > 200
+                  ? `${post.text.slice(0, 200)}…`
                   : post.text}
-                {!expanded && post.text.length > 250 && !open && (
+                {!expanded && post.text.length > 200 && (
                   <button
-                    type="button"
-                    onClick={() => setExpanded(true)}
-                    className="ml-1 text-primary hover:underline font-medium"
-                    aria-label="Expand and see full post text"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setExpanded(true);
+                    }}
+                    className="ml-1 text-primary font-medium"
+                    data-stop-nav
                   >
-                    See more
+                    more
                   </button>
                 )}
               </div>
             )}
 
-            {/* Media */}
-            {attachments.length > 0 && (
+            {/* Media Grid */}
+            {post.attachments && post.attachments.length > 0 && (
               <div className="mt-3">
-                <PostMediaGrid items={attachments} onOpen={openViewer} />
+                <PostMediaGrid
+                  items={post.attachments}
+                  onOpen={openMediaViewer}
+                  isMobile={isMobile}
+                />
               </div>
             )}
 
             {/* Tags */}
             {post.tags && post.tags.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {post.tags.map((t, i) => (
-                  <TagChip key={i} text={t} onClick={() => onTagClick?.(t)} />
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {post.tags.map((tag, i) => (
+                  <TagChip
+                    key={i}
+                    text={tag}
+                    onClick={() => onTagClick?.(tag)}
+                  />
                 ))}
               </div>
             )}
 
             {/* Actions */}
-            <div className="mt-3 flex items-center justify-between text-sm text-muted-foreground">
-              <div className="flex items-center gap-6">
+            <div
+              className={cn(
+                "mt-3 flex items-center justify-between",
+                isMobile ? "text-xs" : "text-sm"
+              )}
+              data-stop-nav
+            >
+              <div
+                className={cn(
+                  "flex items-center",
+                  isMobile ? "gap-4" : "gap-6"
+                )}
+              >
                 <button
                   onClick={handleLike}
                   className={cn(
-                    "inline-flex items-center gap-2 hover:text-foreground transition-colors",
+                    "flex items-center gap-1.5",
                     liked && "text-primary"
                   )}
-                  aria-pressed={liked}
-                  aria-label="Like"
+                  data-stop-nav
                 >
                   <Heart className={cn("w-5 h-5", liked && "fill-current")} />
                   <span>{numberCompact(stats.likes)}</span>
                 </button>
                 <button
-                  onClick={() => {
-                    onComment?.(post);
-                    setOpenIndex(0);
-                    setOpen(true);
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (isMobile) {
+                      // navigate to detail page on mobile to comment
+                      const router = useRouter(); // cannot use hook here; move this outside if needed
+                    } else {
+                      onComment?.(post);
+                      setDetailOpen(true);
+                    }
                   }}
-                  className="inline-flex items-center gap-2 hover:text-foreground transition-colors"
-                  aria-label="Comment"
+                  className="flex items-center gap-1.5"
+                  data-stop-nav
                 >
                   <MessageCircle className="w-5 h-5" />
                   <span>{numberCompact(stats.comments)}</span>
                 </button>
                 <button
-                  onClick={() => {
-                    setStats((s) => ({ ...s, shares: s.shares + 1 }));
-                    onShare?.(post);
-                  }}
-                  className="inline-flex items-center gap-2 hover:text-foreground transition-colors"
-                  aria-label="Share"
+                  onClick={handleShare}
+                  className="flex items-center gap-1.5"
+                  data-stop-nav
                 >
                   <Share2 className="w-5 h-5" />
                   <span>{numberCompact(stats.shares)}</span>
@@ -1132,13 +1586,8 @@ export function PostItem({
               </div>
               <button
                 onClick={handleSave}
-                className={cn(
-                  "inline-flex items-center gap-2 hover:text-foreground transition-colors",
-                  saved && "text-primary"
-                )}
-                aria-pressed={saved}
-                aria-label="Save"
-                title={saved ? "Saved" : "Save"}
+                className={cn(saved && "text-primary")}
+                data-stop-nav
               >
                 <Bookmark className={cn("w-5 h-5", saved && "fill-current")} />
               </button>
@@ -1147,21 +1596,206 @@ export function PostItem({
         </div>
       </article>
 
-      {/* Detail dialog */}
-      <PostDetailDialog
-        post={{ ...post, stats }}
-        open={open}
-        onOpenChange={setOpen}
-        initialIndex={openIndex}
-        fetchComments={fetchComments}
-        onSubmitComment={onSubmitComment}
-        onLike={onLike}
-        onShare={onShare}
-        onSave={onSave}
-      />
+      {/* Detail Views */}
+      {isMobile ? (
+        <>
+          {/* On mobile, we navigate to /home/posts/[id] for full page; keeping sheet here if you want to open comments inline */}
+          <MobileActionsMenu
+            post={post}
+            isAuthor={isAuthor}
+            open={actionsOpen}
+            onOpenChange={setActionsOpen}
+            onEdit={() => {
+              setActionsOpen(false);
+              onMore?.(post);
+            }}
+            onDelete={() => {
+              setActionsOpen(false);
+              handleDelete();
+            }}
+            onShare={() => {
+              setActionsOpen(false);
+              handleShare();
+            }}
+            onCopyLink={() => {
+              setActionsOpen(false);
+              handleCopyLink();
+            }}
+            onNotInterested={() => {
+              setActionsOpen(false);
+              onMore?.({
+                ...post,
+                meta: { ...post.meta, notInterested: true },
+              });
+              toast("We'll show fewer posts like this");
+            }}
+            onMute={() => {
+              setActionsOpen(false);
+              onMore?.({
+                ...post,
+                meta: { ...post.meta, muteUserId: post.user.id },
+              });
+              toast(`Muted @${post.user.username}`);
+            }}
+            onBlock={() => {
+              setActionsOpen(false);
+              onMore?.({
+                ...post,
+                meta: { ...post.meta, blockUserId: post.user.id },
+              });
+              toast(`Blocked @${post.user.username}`);
+            }}
+            onReport={() => {
+              setActionsOpen(false);
+              onMore?.({ ...post, meta: { ...post.meta, reported: true } });
+              toast("Thanks for reporting");
+            }}
+          />
+        </>
+      ) : (
+        <DesktopPostDetail
+          post={{ ...post, stats }}
+          open={detailOpen}
+          onOpenChange={setDetailOpen}
+          initialIndex={detailIndex}
+          fetchComments={fetchComments}
+          onSubmitComment={onSubmitComment}
+          onLike={onLike}
+          onShare={onShare}
+          onSave={onSave}
+        />
+      )}
     </>
   );
 }
+
+
+function PostMediaGrid({
+  items = [],
+  onOpen,
+  isMobile,
+}: {
+  items: PostMedia[];
+  onOpen: (index: number) => void;
+  isMobile?: boolean;
+}) {
+  if (!items.length) return null;
+
+  const count = items.length;
+  const base = cn(
+    "relative w-full overflow-hidden rounded-lg border bg-black",
+    isMobile && "rounded-md"
+  );
+
+  if (count === 1) {
+    const m = items[0];
+    return (
+      <div className={cn(base, "aspect-[4/3] sm:aspect-[16/10]")}>
+        {m.type === "image" ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpen(0);
+            }}
+            className="w-full h-full"
+            data-stop-nav
+          >
+            <img
+              src={m.url}
+              alt={m.alt ?? ""}
+              className="w-full h-full object-cover"
+            />
+          </button>
+        ) : (
+          <VideoPlayer
+            src={m.url}
+            poster={m.posterUrl}
+            className="w-full h-full object-cover"
+            onNavigate={() => onOpen(0)}
+          />
+        )}
+      </div>
+    );
+  }
+
+  if (count === 2) {
+    return (
+      <div className="grid grid-cols-2 gap-1.5">
+        {items.map((m, i) => (
+          <div key={i} className={cn(base, "aspect-square sm:aspect-[4/3]")}>
+            {m.type === "image" ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpen(i);
+                }}
+                className="w-full h-full"
+                data-stop-nav
+              >
+                <img
+                  src={m.url}
+                  alt={m.alt ?? ""}
+                  className="w-full h-full object-cover"
+                />
+              </button>
+            ) : (
+              <VideoPlayer
+                src={m.url}
+                poster={m.posterUrl}
+                className="w-full h-full object-cover"
+                onNavigate={() => onOpen(i)}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-2 gap-1.5">
+      {items.slice(0, 4).map((m, i) => {
+        const isLast = i === 3 && items.length > 4;
+        const extra = items.length - 4;
+        return (
+          <div key={i} className={cn(base, "aspect-square")}>
+            {m.type === "image" ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpen(i);
+                }}
+                className="w-full h-full"
+                data-stop-nav
+              >
+                <img
+                  src={m.url}
+                  alt={m.alt ?? ""}
+                  className="w-full h-full object-cover"
+                />
+              </button>
+            ) : (
+              <VideoPlayer
+                src={m.url}
+                poster={m.posterUrl}
+                className="w-full h-full object-cover"
+                onNavigate={() => onOpen(i)}
+              />
+            )}
+            {isLast && (
+              <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                <span className="text-white text-xl font-semibold">
+                  +{extra}
+                </span>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 
 export function PostFeed({
   posts,
@@ -1182,17 +1816,15 @@ export function PostFeed({
   skeletonCount = 3,
 }: PostFeedProps) {
   const [items, setItems] = React.useState(posts);
-  // Determine viewer (current) user id if not provided via props
   const [viewerId, setViewerId] = React.useState<string | undefined>(
     currentUserId
   );
+  const isMobile = useIsMobile();
 
-  // Keep internal viewerId in sync with prop if parent provides/changes it
   React.useEffect(() => {
     setViewerId(currentUserId);
   }, [currentUserId]);
 
-  // If not provided, fetch from Supabase client on the browser
   React.useEffect(() => {
     let cancelled = false;
     if (viewerId == null) {
@@ -1211,15 +1843,13 @@ export function PostFeed({
     };
   }, [viewerId]);
 
-  // Keep local items in sync when props.posts changes (e.g., navigation or refetch)
   React.useEffect(() => {
     setItems(posts);
   }, [posts]);
 
-  // Internal handler to catch item-level signals (e.g., optimistic delete/restore)
   const handleMore = React.useCallback(
     (p: Post) => {
-      const meta: any = (p as any).meta || {};
+      const meta: any = p.meta || {};
       if (meta.deleted || meta.hidden || meta.notInterested) {
         setItems((prev) => prev.filter((x) => x.id !== p.id));
       } else if (meta.restore) {
@@ -1227,7 +1857,6 @@ export function PostFeed({
           prev.some((x) => x.id === p.id) ? prev : [p, ...prev]
         );
       }
-
       if (meta.muteUserId || meta.blockUserId) {
         const userId = meta.muteUserId || meta.blockUserId;
         setItems((prev) => prev.filter((x) => x.user.id !== userId));
@@ -1245,6 +1874,7 @@ export function PostFeed({
               key={i}
               dense={dense}
               showDivider={showDividers && i < skeletonCount - 1}
+              isMobile={isMobile}
             />
           ))
         : items.map((post, i) => (
@@ -1272,30 +1902,36 @@ export function PostFeed({
   );
 }
 
-/* ----------------------------- Skeletons ----------------------------- */
 
 function PostSkeleton({
   dense,
   showDivider = true,
+  isMobile,
 }: {
   dense?: boolean;
   showDivider?: boolean;
+  isMobile?: boolean;
 }) {
   return (
-    <div className={cn(dense ? "py-4" : "py-6")}>
-      <div className="flex items-start gap-3">
-        <div className="w-10 h-10 rounded-full bg-muted border animate-pulse shrink-0" />
+    <div className={cn(dense ? "py-3" : isMobile ? "py-4" : "py-6")}>
+      <div className={cn("flex gap-3", isMobile && "gap-2")}>
+        <div
+          className={cn(
+            "rounded-full bg-muted border animate-pulse shrink-0",
+            isMobile ? "w-9 h-9" : "w-10 h-10"
+          )}
+        />
         <div className="flex-1 min-w-0">
           <div className="h-4 w-40 bg-muted rounded animate-pulse" />
           <div className="mt-2 space-y-2">
             <div className="h-4 w-full bg-muted rounded animate-pulse" />
             <div className="h-4 w-3/5 bg-muted rounded animate-pulse" />
           </div>
-          <div className="mt-3 rounded-xl border bg-muted/50 h-48 animate-pulse" />
+          <div className="mt-3 rounded-lg border bg-muted/50 h-48 animate-pulse" />
           <div className="mt-3 h-4 w-56 bg-muted rounded animate-pulse" />
         </div>
       </div>
-      {showDivider && <div className="mt-6 border-b" />}
+      {showDivider && <div className="mt-4 border-b" />}
     </div>
   );
 }
