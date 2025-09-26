@@ -1,5 +1,5 @@
 import { createClient } from "@/util/supabase/server";
-import BackButton from "@/components/back-button";
+import { BackButton } from "@/components/back-button";
 import { MobilePostView } from "@/components/post/mobile-post-view";
 import type { MobilePost } from "@/components/post/mobile-post-view";
 
