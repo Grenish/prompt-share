@@ -262,7 +262,7 @@ function toggleLinePrefix(prefix: string) {
             ) : null}
 
             <div className="flex items-center justify-between">
-              <h3 className="text-base font-semibold">About</h3>
+              <h3 className="text-base font-semibold">README.md</h3>
               {!isEditing && canEdit && (
                 <Button
                   variant="outline"
