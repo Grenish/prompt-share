@@ -9,18 +9,17 @@ import {
 } from "@/util/actions/exploreAction";
 import { createClient } from "@/util/supabase/server";
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { BackButton } from "@/components/back-button";
 
 export default async function ExploreModelPage({
   params,
   searchParams,
 }: {
-  params: Promise<{ modelsName: string }> | { modelsName: string };
-  searchParams?: Promise<{ q?: string }> | { q?: string };
+  params: Promise<{ modelsName: string }>;
+  searchParams: Promise<{ q?: string }>;
 }) {
-  const { modelsName } = await (params as Promise<{ modelsName: string }>);
-  const { q } = (await (searchParams as Promise<{ q?: string }>)) || {};
+  const { modelsName } = await params;
+  const { q } = (await searchParams) ?? {};
 
   const normalized = String(modelsName || "").toLowerCase();
   const allowed: ModelCategory[] = [
