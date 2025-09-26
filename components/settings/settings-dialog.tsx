@@ -57,6 +57,7 @@ import {
   Sunset,
   Frame,
   Gem,
+  Star,
 } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/util/supabase/client";
@@ -332,6 +333,21 @@ const COLOR_PALETTES: ColorPaletteConfig[] = [
       muted: "bg-[#dcd9e3]",
       background: "bg-[#f8f7fa]",
       foreground: "bg-[#3d3c4f]",
+    },
+  },
+  {
+    id: "aurora-glow",
+    label: "Aurora Glow",
+    description:
+      "A vibrant and colorful theme inspired by the natural phenomenon of the aurora borealis.",
+    icon: Star,
+    preview: {
+      primary: "bg-[#00e0d7]",
+      secondary: "bg-[#6262cc]",
+      accent: "bg-[#1a2550]",
+      muted: "bg-[#0d1936]",
+      background: "bg-[#020819]",
+      foreground: "bg-[#e9f3fb]",
     },
   },
 ];
