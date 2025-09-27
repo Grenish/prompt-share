@@ -51,7 +51,6 @@ export default function NotificationPage() {
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, read: true } : n))
     );
-    console.log("Clicked notification:", id);
   };
 
   const markAllAsRead = () => {
