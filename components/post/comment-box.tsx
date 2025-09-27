@@ -4,180 +4,207 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Send, Smile, Paperclip } from "lucide-react";
+import { Send } from "lucide-react";
 
 export type CommentBoxProps = {
   value: string;
   onChange: (next: string) => void;
   onSubmit: (text: string) => void | Promise<void>;
   isSubmitting?: boolean;
-
   placeholder?: string;
   maxChars?: number;
-
-  // Optional UI details
-  showAvatar?: boolean;
-  avatarUrl?: string | null;
-  avatarName?: string; // used for initials fallback
-  avatarSize?: number;
-
-  // Optional toolbar callbacks (show icons if provided)
-  onEmojiClick?: () => void;
-  onAttachClick?: () => void;
-
-  // Layout
   className?: string;
-  inputClassName?: string;
-  showHint?: boolean; // "Enter to send • Shift+Enter for newline"
 };
 
-function initialsOf(name?: string) {
-  if (!name) return "U";
-  const parts = name.trim().split(/\s+/);
-  const first = parts[0]?.[0] ?? "";
-  const last = parts.length > 1 ? parts[parts.length - 1][0] ?? "" : "";
-  const res = (first + last).toUpperCase();
-  return res || "U";
+// Emoji-safe length
+function graphemeLength(input: string): number {
+  // Prefer Intl.Segmenter if available, fallback to code points
+  if (typeof Intl !== "undefined" && Intl.Segmenter) {
+    const seg = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+    let count = 0;
+    for (const _ of seg.segment(input)) count++;
+    return count;
+  }
+  return Array.from(input).length;
 }
 
-export function CommentBox({
-  value,
-  onChange,
-  onSubmit,
-  isSubmitting = false,
-  placeholder = "Write a reply...",
-  maxChars = 500,
-  showAvatar = true,
-  avatarUrl = null,
-  avatarName,
-  avatarSize = 36,
-  onEmojiClick,
-  onAttachClick,
-  className,
-  inputClassName,
-  showHint = true,
-}: CommentBoxProps) {
-  const taRef = React.useRef<HTMLTextAreaElement | null>(null);
-  const remaining = maxChars - value.length;
-  const canSend = value.trim().length > 0 && remaining >= 0 && !isSubmitting;
+export const CommentBox = React.forwardRef<
+  HTMLTextAreaElement,
+  CommentBoxProps
+>(
+  (
+    {
+      value,
+      onChange,
+      onSubmit,
+      isSubmitting = false,
+      placeholder = "Add a comment...",
+      maxChars = 280,
+      className,
+    },
+    ref
+  ) => {
+    const textareaRef = React.useRef<HTMLTextAreaElement | null>(null);
+    const [focused, setFocused] = React.useState(false);
 
-  // Auto-resize
-  React.useEffect(() => {
-    const el = taRef.current;
-    if (!el) return;
-    el.style.height = "0px";
-    el.style.height = Math.min(el.scrollHeight, 200) + "px";
-  }, [value]);
+    const setRefs = React.useCallback(
+      (node: HTMLTextAreaElement | null) => {
+        textareaRef.current = node;
+        if (typeof ref === "function") ref(node);
+        else if (ref)
+          (ref as React.MutableRefObject<HTMLTextAreaElement | null>).current =
+            node;
+      },
+      [ref]
+    );
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    const charCount = React.useMemo(() => graphemeLength(value), [value]);
+    const remaining = maxChars - charCount;
+    const nearLimit = remaining <= Math.ceil(maxChars * 0.1);
+    const used = Math.min(charCount, maxChars);
+    const percent = Math.max(0, Math.min(100, (used / maxChars) * 100));
+
+    const dirty = value.trim().length > 0;
+    const canSend = dirty && remaining >= 0 && !isSubmitting;
+
+    // Auto-resize
+    React.useEffect(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      const id = requestAnimationFrame(() => {
+        el.style.height = "auto";
+        el.style.height = Math.min(el.scrollHeight, 200) + "px";
+      });
+      return () => cancelAnimationFrame(id);
+    }, [value]);
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        if (canSend) onSubmit(value.trim());
+      }
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       if (canSend) onSubmit(value.trim());
-    }
-  };
+    };
 
-  return (
-    <div className={cn("w-full", className)}>
-      <div className="flex items-start gap-3">
-        {showAvatar && (
-          <div
-            className="relative shrink-0 overflow-hidden rounded-full border bg-muted"
-            style={{ width: avatarSize, height: avatarSize }}
-            aria-label="Your avatar"
-          >
-            {avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={avatarUrl}
-                alt="You"
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <span className="text-xs font-medium text-muted-foreground leading-none grid place-items-center h-full">
-                {initialsOf(avatarName)}
-              </span>
-            )}
-          </div>
-        )}
+    const counterId = React.useId();
 
-        <div className="flex-1 min-w-0">
+    const ringColorClass =
+      remaining < 0
+        ? "text-destructive"
+        : nearLimit
+        ? "text-amber-500"
+        : "text-primary";
+
+    return (
+      <form onSubmit={handleSubmit} className={cn("w-full", className)}>
+        <div
+          className={cn(
+            "group relative rounded-xl border bg-background/60",
+            "supports-[backdrop-filter]:bg-background/50 backdrop-blur-sm",
+            "transition-all",
+            "focus-within:ring-1 focus-within:ring-primary/30 focus-within:shadow-sm"
+          )}
+        >
+          {/* Text area */}
           <div className="relative">
             <Textarea
-              ref={taRef}
+              ref={setRefs}
               value={value}
               onChange={(e) => onChange(e.target.value)}
               onKeyDown={handleKeyDown}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
               placeholder={placeholder}
               className={cn(
-                "min-h-[44px] resize-none pr-12 focus-visible:ring-1",
-                inputClassName
+                // Reset default textarea chrome
+                "bg-transparent border-0 shadow-none",
+                // Layout
+                "min-h-[44px] w-full pl-4 pr-14 py-3 resize-none",
+                // Typography + focus
+                "focus-visible:ring-0 focus-visible:outline-none",
+                "placeholder:text-muted-foreground/70"
               )}
-              aria-label="Write a reply"
+              aria-label="Write a comment"
               aria-invalid={remaining < 0}
+              aria-describedby={counterId}
               disabled={isSubmitting}
             />
 
-            <Button
-              type="button"
-              size="icon"
-              onClick={() => canSend && onSubmit(value.trim())}
-              disabled={!canSend}
-              className="absolute bottom-2 right-2 h-8 w-8 rounded-full"
-              title="Send (Enter)"
-              aria-label="Send reply"
-            >
-              {isSubmitting ? (
-                <span className="h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
+            {/* Creative but subtle: progress as a circular ring around the send button */}
+            <div
+              className={cn(
+                "absolute bottom-2 right-2 h-9 w-9",
+                ringColorClass
               )}
-            </Button>
+            >
+              {/* Ring background */}
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 rounded-full"
+                style={{
+                  background: `conic-gradient(currentColor ${percent}%, hsl(var(--muted-foreground) / 0.15) 0)`,
+                  transition: "background 140ms ease",
+                }}
+              />
+              {/* Button sits on top, inset so the ring peeks around it */}
+              <Button
+                type="submit"
+                size="icon"
+                disabled={!canSend}
+                variant="outline"
+                className={cn(
+                  "flex items-center justify-center",
+                  "rounded-full transition-transform duration-150",
+                  canSend ? "active:scale-95" : "opacity-60"
+                )}
+                title="Send (Enter)"
+                aria-label="Send comment"
+              >
+                {isSubmitting ? (
+                  <span className="h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                ) : (
+                  <div className="flex items-center justify-center">
+                    <Send className="h-4 w-4" />
+                  </div>
+                )}
+              </Button>
+            </div>
           </div>
 
-          <div className="mt-2 flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              {onEmojiClick && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={onEmojiClick}
-                  title="Emoji"
-                >
-                  <Smile className="h-4 w-4" />
-                </Button>
-              )}
-              {onAttachClick && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={onAttachClick}
-                  title="Attach"
-                >
-                  <Paperclip className="h-4 w-4" />
-                </Button>
-              )}
-              {showHint && (
-                <span className="hidden sm:inline text-xs text-muted-foreground">
-                  Enter to send • Shift+Enter for newline
-                </span>
-              )}
-            </div>
-
+          {/* Subtle helper + counter; appears on focus or when typing */}
+          <div
+            className={cn(
+              "flex items-center justify-between px-3 pb-2 pt-1 text-xs text-muted-foreground",
+              "transition-opacity duration-150",
+              focused || dirty ? "opacity-100" : "opacity-0"
+            )}
+          >
+            <span className="hidden sm:inline select-none">
+              Enter to send • Shift+Enter for newline
+            </span>
             <span
+              id={counterId}
+              aria-live="polite"
               className={cn(
-                "text-xs tabular-nums",
-                remaining < 0 ? "text-destructive" : "text-muted-foreground"
+                "tabular-nums",
+                remaining < 0
+                  ? "text-destructive"
+                  : nearLimit
+                  ? "text-amber-600"
+                  : ""
               )}
             >
-              {value.length}/{maxChars}
+              {charCount}/{maxChars}
             </span>
           </div>
         </div>
-      </div>
-    </div>
-  );
-}
+      </form>
+    );
+  }
+);
+
+CommentBox.displayName = "CommentBox";
