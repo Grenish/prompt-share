@@ -187,34 +187,25 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
         ) : (
           <ul className="divide-y divide-border">
             {filteredNotifications.map((notification) => (
-              <li key={notification.id} role="listitem" className="relative">
-                <button
-                  type="button"
-                  className={cn(
-                    "relative w-full text-left p-4 sm:p-5 transition-all duration-200 cursor-pointer group",
-                    "hover:bg-accent/40 hover:shadow-sm hover:-translate-y-0.5",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-                    !notification.read && "bg-accent/10"
-                  )}
-                  onClick={() => onClickNotification?.(notification.id)}
-                >
-                  {/* Gradient accent bar for unread */}
-                  {!notification.read && (
-                    <span className="pointer-events-none absolute left-0 top-0 h-full w-1.5 bg-gradient-to-b from-primary/70 via-primary to-primary/70 rounded-r-md" />
-                  )}
+              <li
+                key={notification.id}
+                role="listitem"
+                className={cn(
+                  "relative p-4 sm:p-5 transition-all duration-200 cursor-pointer group",
+                  "hover:bg-accent/40 hover:shadow-sm hover:-translate-y-0.5",
+                  !notification.read && "bg-accent/10"
+                )}
+                onClick={() => onClickNotification?.(notification.id)}
+              >
+                {/* Gradient accent bar for unread */}
+                {!notification.read && (
+                  <span className="pointer-events-none absolute left-0 top-0 h-full w-1.5 bg-gradient-to-b from-primary/70 via-primary to-primary/70 rounded-r-md" />
+                )}
 
-                  {/* Unread dot */}
-                  {!notification.read && (
-                    <span className="absolute right-4 top-4 w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
-                  )}
-
-                  <div className="flex items-start gap-3 sm:gap-4">
-                    …
-                  </div>
-                </button>
-              </li>
-            ))}
-          </ul>
+                {/* Unread dot */}
+                {!notification.read && (
+                  <span className="absolute right-4 top-4 w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
+                )}
 
                 <div className="flex items-start gap-3 sm:gap-4">
                   <div
