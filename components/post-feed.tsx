@@ -21,7 +21,6 @@ import {
   VolumeX,
   Link2,
   EyeOff,
-  ChevronDown,
   Play,
   Pause,
 } from "lucide-react";
@@ -241,7 +240,7 @@ function TagChip({ text, onClick }: { text: string; onClick?: () => void }) {
   );
 }
 
-/* ===================== Video Autoplay on View ===================== */
+/* ======================== Video Player ======================== */
 
 function useAutoplayOnView(
   videoRef: React.RefObject<HTMLVideoElement | null>,
@@ -283,8 +282,6 @@ function useAutoplayOnView(
   }, [videoRef, enabled]);
 }
 
-/* ======================== Video Player Component ======================== */
-
 function VideoPlayer({
   src,
   poster,
@@ -292,7 +289,7 @@ function VideoPlayer({
   autoPlayInView = true,
   muted = true,
   showTapOverlay = true,
-  onNavigate, // call to navigate on first tap if needed
+  onNavigate,
 }: {
   src: string;
   poster?: string;
@@ -313,14 +310,13 @@ function VideoPlayer({
     const v = videoRef.current;
     if (!v) return;
 
-    // If we want navigation (e.g., on mobile), do it on the first tap
     if (!hasInteracted && onNavigate) {
       onNavigate();
       return;
     }
 
     setHasInteracted(true);
-    v.muted = muted; // stay muted unless you implement a mute toggle
+    v.muted = muted;
 
     if (v.paused) {
       v.play().catch(() => {});
@@ -340,7 +336,7 @@ function VideoPlayer({
         src={src}
         poster={poster}
         className={className}
-        muted={true} // keep muted for autoplay policies
+        muted
         loop
         playsInline
         preload="metadata"
@@ -366,388 +362,6 @@ function VideoPlayer({
         </div>
       )}
     </div>
-  );
-}
-
-/* ======================== Mobile Media Viewer ======================== */
-
-function MobileMediaViewer({
-  items = [],
-  initialIndex = 0,
-  open,
-  onOpenChange,
-}: {
-  items: PostMedia[];
-  initialIndex?: number;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const [index, setIndex] = React.useState(initialIndex);
-  const [startX, setStartX] = React.useState(0);
-
-  React.useEffect(() => {
-    setIndex(initialIndex);
-  }, [initialIndex]);
-
-  React.useEffect(() => {
-    if (!open) return;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [open]);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setStartX(e.touches[0].clientX);
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    const endX = e.changedTouches[0].clientX;
-    const diff = endX - startX;
-    if (Math.abs(diff) > 50) {
-      if (diff > 0 && index > 0) setIndex(index - 1);
-      else if (diff < 0 && index < items.length - 1) setIndex(index + 1);
-    }
-  };
-
-  if (!open || !items.length) return null;
-
-  const current = items[index];
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black">
-      <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-4 bg-gradient-to-b from-black/60 to-transparent">
-        <button
-          onClick={() => onOpenChange(false)}
-          className="p-2 rounded-full bg-white/10 backdrop-blur"
-        >
-          <X className="w-5 h-5 text-white" />
-        </button>
-        <span className="text-white text-sm font-medium">
-          {index + 1} / {items.length}
-        </span>
-      </div>
-
-      <div
-        className="relative w-full h-full flex items-center justify-center"
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-      >
-        {current.type === "image" ? (
-          <img
-            src={current.url}
-            alt={current.alt ?? ""}
-            className="w-full h-full object-contain"
-          />
-        ) : (
-          <video
-            src={current.url}
-            poster={current.posterUrl}
-            className="w-full h-full object-contain"
-            controls
-            autoPlay
-            playsInline
-            muted
-          />
-        )}
-      </div>
-
-      {items.length > 1 && (
-        <div className="absolute bottom-safe left-0 right-0 flex justify-center gap-1.5 pb-4">
-          {items.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => setIndex(i)}
-              className={cn(
-                "w-1.5 h-1.5 rounded-full transition-all",
-                i === index ? "w-6 bg-white" : "bg-white/50"
-              )}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ======================= Mobile Post Detail ======================== */
-
-function MobilePostDetail({
-  post,
-  open,
-  onOpenChange,
-  fetchComments,
-  onSubmitComment,
-  onLike,
-  onShare,
-  onSave,
-}: {
-  post: Post;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  fetchComments?: (post: Post) => Promise<PostComment[]>;
-  onSubmitComment?: (post: Post, text: string) => Promise<PostComment | void>;
-  onLike?: (post: Post, nextLiked: boolean) => void | Promise<void>;
-  onShare?: (post: Post) => void;
-  onSave?: (post: Post, nextSaved: boolean) => void | Promise<void>;
-}) {
-  const [liked, setLiked] = React.useState(Boolean(post.liked));
-  const [saved, setSaved] = React.useState(Boolean(post.saved));
-  const [stats, setStats] = React.useState(
-    post.stats ?? { likes: 0, comments: 0, shares: 0 }
-  );
-  const [comments, setComments] = React.useState<PostComment[] | null>(
-    post.comments ?? null
-  );
-  const [loadingComments, setLoadingComments] = React.useState(false);
-  const [reply, setReply] = React.useState("");
-  const [mediaViewerOpen, setMediaViewerOpen] = React.useState(false);
-  const [mediaIndex, setMediaIndex] = React.useState(0);
-
-  React.useEffect(() => {
-    if (open && !comments && fetchComments) {
-      setLoadingComments(true);
-      fetchComments(post)
-        .then((res) => setComments(res))
-        .catch(() => setComments([]))
-        .finally(() => setLoadingComments(false));
-    }
-  }, [open, comments, fetchComments, post]);
-
-  const handleLike = async () => {
-    const next = !liked;
-    setLiked(next);
-    setStats((s) => ({ ...s, likes: s.likes + (next ? 1 : -1) }));
-    try {
-      await onLike?.(post, next);
-    } catch {
-      setLiked(!next);
-      setStats((s) => ({ ...s, likes: s.likes + (next ? -1 : 1) }));
-    }
-  };
-
-  const handleSave = async () => {
-    const next = !saved;
-    setSaved(next);
-    try {
-      await onSave?.(post, next);
-    } catch {
-      setSaved(!next);
-    }
-  };
-
-  const handleSubmitReply = async () => {
-    const text = reply.trim();
-    if (!text) return;
-    setReply("");
-    const optimistic: PostComment = {
-      id: `local-${Date.now()}`,
-      user: post.user,
-      text,
-      createdAt: Date.now(),
-    };
-    setComments((c) => [optimistic, ...(c ?? [])]);
-    setStats((s) => ({ ...s, comments: s.comments + 1 }));
-    try {
-      const created = await onSubmitComment?.(post, text);
-      if (created) {
-        setComments((c) =>
-          (c ?? []).map((cm) => (cm.id === optimistic.id ? created : cm))
-        );
-      }
-    } catch {}
-  };
-
-  const openMedia = (index: number) => {
-    setMediaIndex(index);
-    setMediaViewerOpen(true);
-  };
-
-  return (
-    <>
-      <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent
-          side="bottom"
-          className="h-[85vh] rounded-t-2xl p-0 flex flex-col"
-        >
-          <div className="sticky top-0 z-10 bg-background border-b">
-            <div className="flex items-center justify-between p-4">
-              <div className="flex items-center gap-3">
-                <Avatar user={post.user} size={36} />
-                <div>
-                  <div className="flex items-center gap-1">
-                    <span className="font-semibold text-sm">
-                      {post.user.name}
-                    </span>
-                    {post.user.verified && (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    @{post.user.username} · {formatRelativeTime(post.createdAt)}
-                  </p>
-                </div>
-              </div>
-              <button onClick={() => onOpenChange(false)}>
-                <ChevronDown className="w-5 h-5 text-muted-foreground" />
-              </button>
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto">
-            <div className="p-4 space-y-4">
-              {post.text && (
-                <p className="text-[15px] leading-relaxed">{post.text}</p>
-              )}
-
-              {post.attachments && post.attachments.length > 0 && (
-                <div className="grid grid-cols-2 gap-2">
-                  {post.attachments.slice(0, 4).map((media, i) => (
-                    <div
-                      key={i}
-                      className="relative aspect-square rounded-lg overflow-hidden bg-black"
-                    >
-                      {media.type === "image" ? (
-                        <button
-                          onClick={() => openMedia(i)}
-                          className="w-full h-full"
-                          data-stop-nav
-                        >
-                          <img
-                            src={media.url}
-                            alt={media.alt ?? ""}
-                            className="w-full h-full object-cover"
-                          />
-                        </button>
-                      ) : (
-                        <VideoPlayer
-                          src={media.url}
-                          poster={media.posterUrl}
-                          className="w-full h-full object-cover"
-                          onNavigate={() => openMedia(i)}
-                        />
-                      )}
-                      {i === 3 && (post.attachments?.length ?? 0) > 4 && (
-                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                          <span className="text-white text-xl font-semibold">
-                            +{(post.attachments?.length ?? 0) - 4}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {post.tags && post.tags.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {post.tags.map((tag, i) => (
-                    <TagChip key={i} text={tag} />
-                  ))}
-                </div>
-              )}
-
-              <div className="flex items-center justify-around py-3 border-y">
-                <button
-                  onClick={handleLike}
-                  className={cn(
-                    "flex flex-col items-center gap-1",
-                    liked && "text-primary"
-                  )}
-                  data-stop-nav
-                >
-                  <Heart className={cn("w-6 h-6", liked && "fill-current")} />
-                  <span className="text-xs">{numberCompact(stats.likes)}</span>
-                </button>
-                <div className="flex flex-col items-center gap-1" data-stop-nav>
-                  <MessageCircle className="w-6 h-6" />
-                  <span className="text-xs">
-                    {numberCompact(stats.comments)}
-                  </span>
-                </div>
-                <button
-                  onClick={() => {
-                    setStats((s) => ({ ...s, shares: s.shares + 1 }));
-                    onShare?.(post);
-                  }}
-                  className="flex flex-col items-center gap-1"
-                  data-stop-nav
-                >
-                  <Share2 className="w-6 h-6" />
-                  <span className="text-xs">{numberCompact(stats.shares)}</span>
-                </button>
-                <button
-                  onClick={handleSave}
-                  className={cn(
-                    "flex flex-col items-center gap-1",
-                    saved && "text-primary"
-                  )}
-                  data-stop-nav
-                >
-                  <Bookmark
-                    className={cn("w-6 h-6", saved && "fill-current")}
-                  />
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                <h3 className="font-semibold text-sm">Comments</h3>
-                {loadingComments ? (
-                  <p className="text-sm text-muted-foreground">Loading...</p>
-                ) : comments && comments.length > 0 ? (
-                  <div className="space-y-3">
-                    {comments.map((c) => (
-                      <div key={c.id} className="flex gap-3">
-                        <Avatar user={c.user} size={32} />
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 text-xs">
-                            <span className="font-semibold">{c.user.name}</span>
-                            <span className="text-muted-foreground">
-                              {formatRelativeTime(c.createdAt)}
-                            </span>
-                          </div>
-                          <p className="text-sm mt-1">{c.text}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    No comments yet
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="sticky bottom-0 border-t bg-background p-4">
-            <div className="flex gap-2">
-              <Textarea
-                value={reply}
-                onChange={(e) => setReply(e.target.value)}
-                placeholder="Add a comment..."
-                className="min-h-[40px] resize-none"
-                rows={1}
-              />
-              <Button
-                onClick={handleSubmitReply}
-                disabled={!reply.trim()}
-                size="icon"
-              >
-                <Send className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        </SheetContent>
-      </Sheet>
-
-      <MobileMediaViewer
-        items={post.attachments ?? []}
-        initialIndex={mediaIndex}
-        open={mediaViewerOpen}
-        onOpenChange={setMediaViewerOpen}
-      />
-    </>
   );
 }
 
@@ -867,14 +481,13 @@ function DesktopPostDetail({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/60 backdrop-blur-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-xs">
       <div className="absolute inset-0" onClick={() => onOpenChange(false)} />
-
       <div
         className="relative w-[92vw] max-w-7xl h-[88vh] bg-card rounded-2xl overflow-hidden flex shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="relative flex-1 flex items-center justify-center bg-black">
+        <div className="relative flex-1 flex items-center justify-center bg-transparent">
           {attachments.length > 0 ? (
             <>
               {attachments[mediaIndex].type === "image" ? (
@@ -887,7 +500,7 @@ function DesktopPostDetail({
                 <video
                   src={attachments[mediaIndex].url}
                   poster={attachments[mediaIndex].posterUrl}
-                  className="object-contain w-full h-full"
+                  className="object-cover w-full h-full"
                   controls
                   autoPlay
                   playsInline
@@ -895,7 +508,6 @@ function DesktopPostDetail({
                   loop
                 />
               )}
-
               {attachments.length > 1 && (
                 <>
                   <button
@@ -918,7 +530,6 @@ function DesktopPostDetail({
                   >
                     <ChevronRight className="w-6 h-6" />
                   </button>
-
                   <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
                     {attachments.map((_, i) => (
                       <button
@@ -941,7 +552,7 @@ function DesktopPostDetail({
           )}
         </div>
 
-        <div className="w-[420px] flex flex-col bg-card border-l">
+        <div className="w-[420px] flex flex-col border-l">
           <div className="p-6 border-b flex items-start justify-between">
             <div className="flex items-start gap-3">
               <Avatar user={post.user} size={42} />
@@ -970,7 +581,6 @@ function DesktopPostDetail({
               {post.text && (
                 <p className="text-[15px] leading-relaxed">{post.text}</p>
               )}
-
               {post.tags && post.tags.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {post.tags.map((t, i) => (
@@ -978,7 +588,6 @@ function DesktopPostDetail({
                   ))}
                 </div>
               )}
-
               <div className="flex items-center gap-4 pt-2">
                 <button
                   onClick={handleLike}
@@ -1197,7 +806,7 @@ function MobileActionsMenu({
 
 /* ========================== Post Item Component ======================== */
 
-export function PostItem({
+export const PostItem = React.memo(function PostItem({
   post,
   dense,
   className,
@@ -1223,11 +832,20 @@ export function PostItem({
   const [detailOpen, setDetailOpen] = React.useState(false);
   const [detailIndex, setDetailIndex] = React.useState(0);
   const [actionsOpen, setActionsOpen] = React.useState(false);
-  const [mediaViewerOpen, setMediaViewerOpen] = React.useState(false);
-  const [mediaIndex, setMediaIndex] = React.useState(0);
 
   const isAuthor = currentUserId === post.user.id;
   const postUrl = `/home/posts/${post.id}`;
+
+  const navigateToProfile = (e?: React.SyntheticEvent) => {
+    e?.stopPropagation?.();
+    const uname = post.user.username?.trim();
+    if (uname) {
+      router.push(`/home/profile/${encodeURIComponent(uname)}`);
+    } else {
+      toast.error("Username not available");
+    }
+    onUserClick?.(post.user);
+  };
 
   const handleLike = async () => {
     const next = !liked;
@@ -1254,14 +872,18 @@ export function PostItem({
   const handleShare = async () => {
     try {
       setStats((s) => ({ ...s, shares: s.shares + 1 }));
+      const absUrl =
+        typeof window !== "undefined"
+          ? `${window.location.origin}${postUrl}`
+          : postUrl;
       if (navigator?.share) {
         await navigator.share({
-          title: `${post.user.name} on Social`,
+          title: `${post.user.name}`,
           text: post.text?.slice(0, 140),
-          url: postUrl,
+          url: absUrl,
         });
       } else if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(postUrl);
+        await navigator.clipboard.writeText(absUrl);
         toast.success("Link copied");
       }
       onShare?.(post);
@@ -1270,7 +892,11 @@ export function PostItem({
 
   const handleCopyLink = async () => {
     try {
-      await navigator.clipboard.writeText(postUrl);
+      const absUrl =
+        typeof window !== "undefined"
+          ? `${window.location.origin}${postUrl}`
+          : postUrl;
+      await navigator.clipboard.writeText(absUrl);
       toast.success("Link copied");
     } catch {
       toast.error("Could not copy link");
@@ -1291,7 +917,6 @@ export function PostItem({
 
   const openMediaViewer = (index: number) => {
     if (isMobile) {
-      // For mobile: navigate to dedicated post page instead of in-feed viewer
       router.push(postUrl);
     } else {
       setDetailIndex(index);
@@ -1300,16 +925,11 @@ export function PostItem({
   };
 
   const handleContainerClickCapture = (e: React.MouseEvent) => {
-    // Prevent navigation when clicking on interactive elements
     const target = e.target as HTMLElement;
     const interactive = target.closest(
       'a, button, input, textarea, select, label, [role="button"], [data-stop-nav]'
     );
     if (interactive) return;
-
-    // On mobile: navigate to the post page.
-    // On larger screens: clicking outside media should also navigate to the post page.
-    // Media elements themselves call onOpen(...) and stop propagation to open the dialog.
     router.push(postUrl);
   };
 
@@ -1341,19 +961,17 @@ export function PostItem({
           <Avatar
             user={post.user}
             size={avatarSize}
-            onClick={() => onUserClick?.(post.user)}
+            onClick={() => {
+              if (isMobile) navigateToProfile();
+              else onUserClick?.(post.user);
+            }}
           />
-
           <div className="flex-1 min-w-0">
-            {/* Header */}
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-1 text-sm flex-wrap min-w-0">
                 {isMobile ? (
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onUserClick?.(post.user);
-                    }}
+                    onClick={navigateToProfile}
                     className="font-semibold"
                     data-stop-nav
                   >
@@ -1388,10 +1006,7 @@ export function PostItem({
                       </div>
                       <Button
                         className="mt-3 w-full"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onUserClick?.(post.user);
-                        }}
+                        onClick={navigateToProfile}
                         data-stop-nav
                       >
                         View Profile
@@ -1439,7 +1054,7 @@ export function PostItem({
                           Share
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          variant="destructive"
+                          className="text-destructive"
                           onClick={handleDelete}
                         >
                           Delete
@@ -1464,7 +1079,7 @@ export function PostItem({
                           Not interested
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          variant="destructive"
+                          className="text-destructive"
                           onClick={() =>
                             onMore?.({
                               ...post,
@@ -1481,7 +1096,6 @@ export function PostItem({
               )}
             </div>
 
-            {/* Content */}
             {post.text && (
               <div
                 className={cn(
@@ -1509,7 +1123,6 @@ export function PostItem({
               </div>
             )}
 
-            {/* Media Grid */}
             {post.attachments && post.attachments.length > 0 && (
               <div className="mt-3">
                 <PostMediaGrid
@@ -1520,7 +1133,6 @@ export function PostItem({
               </div>
             )}
 
-            {/* Tags */}
             {post.tags && post.tags.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {post.tags.map((tag, i) => (
@@ -1533,7 +1145,6 @@ export function PostItem({
               </div>
             )}
 
-            {/* Actions */}
             <div
               className={cn(
                 "mt-3 flex items-center justify-between",
@@ -1559,7 +1170,6 @@ export function PostItem({
                   <span>{numberCompact(stats.likes)}</span>
                 </button>
                 <button
-                <button
                   onClick={(e) => {
                     e.stopPropagation();
                     if (isMobile) {
@@ -1569,9 +1179,6 @@ export function PostItem({
                       setDetailOpen(true);
                     }
                   }}
-                   className="flex items-center gap-1.5"
-                   data-stop-nav
-                 >
                   className="flex items-center gap-1.5"
                   data-stop-nav
                 >
@@ -1599,63 +1206,7 @@ export function PostItem({
         </div>
       </article>
 
-      {/* Detail Views */}
-      {isMobile ? (
-        <>
-          {/* On mobile, we navigate to /home/posts/[id] for full page; keeping sheet here if you want to open comments inline */}
-          <MobileActionsMenu
-            post={post}
-            isAuthor={isAuthor}
-            open={actionsOpen}
-            onOpenChange={setActionsOpen}
-            onEdit={() => {
-              setActionsOpen(false);
-              onMore?.(post);
-            }}
-            onDelete={() => {
-              setActionsOpen(false);
-              handleDelete();
-            }}
-            onShare={() => {
-              setActionsOpen(false);
-              handleShare();
-            }}
-            onCopyLink={() => {
-              setActionsOpen(false);
-              handleCopyLink();
-            }}
-            onNotInterested={() => {
-              setActionsOpen(false);
-              onMore?.({
-                ...post,
-                meta: { ...post.meta, notInterested: true },
-              });
-              toast("We'll show fewer posts like this");
-            }}
-            onMute={() => {
-              setActionsOpen(false);
-              onMore?.({
-                ...post,
-                meta: { ...post.meta, muteUserId: post.user.id },
-              });
-              toast(`Muted @${post.user.username}`);
-            }}
-            onBlock={() => {
-              setActionsOpen(false);
-              onMore?.({
-                ...post,
-                meta: { ...post.meta, blockUserId: post.user.id },
-              });
-              toast(`Blocked @${post.user.username}`);
-            }}
-            onReport={() => {
-              setActionsOpen(false);
-              onMore?.({ ...post, meta: { ...post.meta, reported: true } });
-              toast("Thanks for reporting");
-            }}
-          />
-        </>
-      ) : (
+      {!isMobile && (
         <DesktopPostDetail
           post={{ ...post, stats }}
           open={detailOpen}
@@ -1668,10 +1219,61 @@ export function PostItem({
           onSave={onSave}
         />
       )}
+
+      <MobileActionsMenu
+        post={post}
+        isAuthor={isAuthor}
+        open={actionsOpen}
+        onOpenChange={setActionsOpen}
+        onEdit={() => {
+          setActionsOpen(false);
+          onMore?.(post);
+        }}
+        onDelete={() => {
+          setActionsOpen(false);
+          handleDelete();
+        }}
+        onShare={() => {
+          setActionsOpen(false);
+          handleShare();
+        }}
+        onCopyLink={() => {
+          setActionsOpen(false);
+          handleCopyLink();
+        }}
+        onNotInterested={() => {
+          setActionsOpen(false);
+          onMore?.({
+            ...post,
+            meta: { ...post.meta, notInterested: true },
+          });
+          toast("We'll show fewer posts like this");
+        }}
+        onMute={() => {
+          setActionsOpen(false);
+          onMore?.({
+            ...post,
+            meta: { ...post.meta, muteUserId: post.user.id },
+          });
+          toast(`Muted @${post.user.username}`);
+        }}
+        onBlock={() => {
+          setActionsOpen(false);
+          onMore?.({
+            ...post,
+            meta: { ...post.meta, blockUserId: post.user.id },
+          });
+          toast(`Blocked @${post.user.username}`);
+        }}
+        onReport={() => {
+          setActionsOpen(false);
+          onMore?.({ ...post, meta: { ...post.meta, reported: true } });
+          toast("Thanks for reporting");
+        }}
+      />
     </>
   );
-}
-
+});
 
 function PostMediaGrid({
   items = [],
@@ -1799,7 +1401,6 @@ function PostMediaGrid({
   );
 }
 
-
 export function PostFeed({
   posts,
   className,
@@ -1904,7 +1505,6 @@ export function PostFeed({
     </div>
   );
 }
-
 
 function PostSkeleton({
   dense,
