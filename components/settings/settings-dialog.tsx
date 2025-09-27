@@ -568,12 +568,14 @@ export function SettingsDialog({
                   onClick={() => handleSave(active)}
                   disabled={isSaving(active)}
                   className="h-8 px-3"
+                  aria-label="Save changes"
                 >
                   {isSaving(active) ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                   ) : (
-                    <Check className="h-4 w-4" />
+                    <Check className="h-4 w-4" aria-hidden="true" />
                   )}
+                  <span className="sr-only">Save changes</span>
                 </Button>
               )}
             </div>
