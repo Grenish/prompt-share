@@ -26,7 +26,15 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { deletePosts } from "@/util/actions/postsActions";
+import {
+  deletePosts,
+  togglePostLike,
+  togglePostSave,
+  createPostComment,
+  getPostComments,
+  getPostEngagement,
+  type PostCommentPayload,
+} from "@/util/actions/postsActions";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -108,13 +116,18 @@ export type Post = {
   comments?: PostComment[];
 };
 
+type PostStats = NonNullable<Post["stats"]>;
+
 export type PostItemProps = {
   post: Post;
   dense?: boolean;
   className?: string;
   currentUserId?: string;
 
-  onLike?: (post: Post, nextLiked: boolean) => void | Promise<void>;
+  onLike?: (
+    post: Post,
+    nextLiked: boolean
+  ) => void | { likes?: number } | Promise<void | { likes?: number }>;
   onComment?: (post: Post) => void;
   onShare?: (post: Post) => void;
   onSave?: (post: Post, nextSaved: boolean) => void | Promise<void>;
@@ -384,7 +397,10 @@ function DesktopPostDetail({
   initialIndex?: number;
   fetchComments?: (post: Post) => Promise<PostComment[]>;
   onSubmitComment?: (post: Post, text: string) => Promise<PostComment | void>;
-  onLike?: (post: Post, nextLiked: boolean) => void | Promise<void>;
+  onLike?: (
+    post: Post,
+    nextLiked: boolean
+  ) => void | { likes?: number } | Promise<void | { likes?: number }>;
   onShare?: (post: Post) => void;
   onSave?: (post: Post, nextSaved: boolean) => void | Promise<void>;
 }) {
@@ -438,12 +454,23 @@ function DesktopPostDetail({
   const handleLike = async () => {
     const next = !liked;
     setLiked(next);
-    setStats((s) => ({ ...s, likes: s.likes + (next ? 1 : -1) }));
+    setStats((s) => ({ ...s, likes: Math.max(0, s.likes + (next ? 1 : -1)) }));
     try {
-      await onLike?.(post, next);
+      const result = await onLike?.(post, next);
+      if (
+        result &&
+        typeof result === "object" &&
+        "likes" in result &&
+        typeof result.likes === "number"
+      ) {
+        setStats((s) => ({
+          ...s,
+          likes: Math.max(0, result.likes ?? s.likes),
+        }));
+      }
     } catch {
       setLiked(!next);
-      setStats((s) => ({ ...s, likes: s.likes + (next ? -1 : 1) }));
+      setStats((s) => ({ ...s, likes: Math.max(0, s.likes + (next ? -1 : 1)) }));
     }
   };
 
@@ -850,12 +877,23 @@ export const PostItem = React.memo(function PostItem({
   const handleLike = async () => {
     const next = !liked;
     setLiked(next);
-    setStats((s) => ({ ...s, likes: s.likes + (next ? 1 : -1) }));
+    setStats((s) => ({ ...s, likes: Math.max(0, s.likes + (next ? 1 : -1)) }));
     try {
-      await onLike?.(post, next);
+      const result = await onLike?.(post, next);
+      if (
+        result &&
+        typeof result === "object" &&
+        "likes" in result &&
+        typeof result.likes === "number"
+      ) {
+        setStats((s) => ({
+          ...s,
+          likes: Math.max(0, result.likes ?? s.likes),
+        }));
+      }
     } catch {
       setLiked(!next);
-      setStats((s) => ({ ...s, likes: s.likes + (next ? -1 : 1) }));
+      setStats((s) => ({ ...s, likes: Math.max(0, s.likes + (next ? -1 : 1)) }));
     }
   };
 
@@ -1407,15 +1445,15 @@ export function PostFeed({
   dense,
   showDividers = true,
   currentUserId,
-  onLike,
+  onLike: externalOnLike,
   onComment,
   onShare,
-  onSave,
+  onSave: externalOnSave,
   onMore,
   onTagClick,
   onUserClick,
-  fetchComments,
-  onSubmitComment,
+  fetchComments: externalFetchComments,
+  onSubmitComment: externalSubmitComment,
   loading,
   skeletonCount = 3,
 }: PostFeedProps) {
@@ -1451,6 +1489,59 @@ export function PostFeed({
     setItems(posts);
   }, [posts]);
 
+  React.useEffect(() => {
+    let cancelled = false;
+    const loadEngagement = async () => {
+      const ids = posts.map((p) => p.id).filter(Boolean);
+      if (ids.length === 0) return;
+      const res = await getPostEngagement(ids);
+      if (cancelled) return;
+      if (!res.ok) {
+        if (res.error) toast.error(res.error);
+        return;
+      }
+      const map = new Map(res.items?.map((item) => [item.postId, item]));
+      if (map.size === 0) return;
+      setItems((prev) =>
+        prev.map((post) => {
+          const summary = map.get(post.id);
+          if (!summary) return post;
+          const baseStats = post.stats ?? { likes: 0, comments: 0, shares: 0 };
+          return {
+            ...post,
+            stats: {
+              ...baseStats,
+              likes: summary.likes,
+              comments: summary.comments,
+            },
+            liked: summary.liked,
+            saved: summary.saved,
+          };
+        })
+      );
+    };
+
+    loadEngagement();
+    return () => {
+      cancelled = true;
+    };
+  }, [posts, viewerId]);
+
+  const mapPayloadToComment = React.useCallback(
+    (payload: PostCommentPayload): PostComment => ({
+      id: payload.id,
+      text: payload.text,
+      createdAt: payload.createdAt,
+      user: {
+        id: payload.user.id,
+        name: payload.user.name,
+        username: payload.user.username,
+        avatarUrl: payload.user.avatarUrl,
+      },
+    }),
+    []
+  );
+
   const handleMore = React.useCallback(
     (p: Post) => {
       const meta: any = p.meta || {};
@@ -1470,6 +1561,135 @@ export function PostFeed({
     [onMore]
   );
 
+  const handleLikeToggle = React.useCallback(
+    async (post: Post, nextLiked: boolean) => {
+      const res = await togglePostLike(post.id, nextLiked);
+      if (!res.ok) {
+        toast.error(res.error ?? "Couldn't update like");
+        throw new Error(res.error ?? "Failed to update like");
+      }
+
+      setItems((prev) =>
+        prev.map((item) => {
+          if (item.id !== post.id) return item;
+          const prevStats: PostStats = item.stats ?? {
+            likes: 0,
+            comments: 0,
+            shares: 0,
+          };
+          return {
+            ...item,
+            liked: res.liked ?? nextLiked,
+            stats: {
+              ...prevStats,
+              likes: res.likes ?? prevStats.likes,
+            },
+          };
+        })
+      );
+
+      const fallbackLikes = res.likes ?? post.stats?.likes ?? 0;
+
+      const externalResult = await externalOnLike?.(post, nextLiked);
+      if (
+        externalResult &&
+        typeof externalResult === "object" &&
+        "likes" in externalResult &&
+        typeof externalResult.likes === "number"
+      ) {
+        setItems((prev) =>
+          prev.map((item) => {
+            if (item.id !== post.id) return item;
+            const prevStats: PostStats = item.stats ?? {
+              likes: 0,
+              comments: 0,
+              shares: 0,
+            };
+            return {
+              ...item,
+              stats: {
+                ...prevStats,
+                likes: externalResult.likes ?? prevStats.likes,
+              },
+            };
+          })
+        );
+        return { likes: externalResult.likes };
+      }
+
+      return { likes: fallbackLikes };
+    },
+    [externalOnLike, setItems]
+  );
+
+  const handleSaveToggle = React.useCallback(
+    async (post: Post, nextSaved: boolean) => {
+      const res = await togglePostSave(post.id, nextSaved);
+      if (!res.ok) {
+        toast.error(res.error ?? "Couldn't update save");
+        throw new Error(res.error ?? "Failed to update save");
+      }
+
+      setItems((prev) =>
+        prev.map((item) =>
+          item.id === post.id ? { ...item, saved: res.saved ?? nextSaved } : item
+        )
+      );
+
+      await externalOnSave?.(post, nextSaved);
+    },
+    [externalOnSave]
+  );
+
+  const handleFetchComments = React.useCallback(
+    async (post: Post) => {
+      const res = await getPostComments(post.id);
+      if (!res.ok || !res.comments) {
+        if (res.error) toast.error(res.error);
+        const external = await externalFetchComments?.(post);
+        if (external) return external;
+        throw new Error(res.error ?? "Failed to load comments");
+      }
+      const mapped = res.comments.map(mapPayloadToComment);
+      const external = await externalFetchComments?.(post);
+      return external ?? mapped;
+    },
+    [externalFetchComments, mapPayloadToComment]
+  );
+
+  const handleSubmitComment = React.useCallback(
+    async (post: Post, text: string) => {
+      const res = await createPostComment(post.id, text);
+      if (!res.ok || !res.comment) {
+        toast.error(res.error ?? "Couldn't post comment");
+        throw new Error(res.error ?? "Failed to post comment");
+      }
+
+      setItems((prev) =>
+        prev.map((item) => {
+          if (item.id !== post.id) return item;
+          const prevStats: PostStats = item.stats ?? {
+            likes: 0,
+            comments: 0,
+            shares: 0,
+          };
+          return {
+            ...item,
+            stats: {
+              ...prevStats,
+              comments: res.commentsCount ?? prevStats.comments + 1,
+            },
+          };
+        })
+      );
+
+      const mapped = mapPayloadToComment(res.comment);
+      const external = await externalSubmitComment?.(post, text);
+      return external ?? mapped;
+    },
+    [externalSubmitComment, mapPayloadToComment]
+  );
+
   return (
     <div className={cn("w-full", className)}>
       {loading
@@ -1487,15 +1707,15 @@ export function PostFeed({
                 post={post}
                 dense={dense}
                 currentUserId={viewerId}
-                onLike={onLike}
+                onLike={handleLikeToggle}
                 onComment={onComment}
                 onShare={onShare}
-                onSave={onSave}
+                onSave={handleSaveToggle}
                 onMore={handleMore}
                 onTagClick={onTagClick}
                 onUserClick={onUserClick}
-                fetchComments={fetchComments}
-                onSubmitComment={onSubmitComment}
+                fetchComments={handleFetchComments}
+                onSubmitComment={handleSubmitComment}
               />
               {showDividers && i < items.length - 1 && (
                 <div className="border-b" />
