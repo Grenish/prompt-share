@@ -73,7 +73,12 @@ export default function NotificationPage() {
             >
               Mark all as read
             </Button>
-            <Button className="p-2" variant="ghost" size="icon">
+            <Button
+              className="p-2"
+              variant="ghost"
+              size="icon"
+              aria-label="Notification settings"
+            >
               <Settings className="h-4 w-4" />
             </Button>
           </div>
