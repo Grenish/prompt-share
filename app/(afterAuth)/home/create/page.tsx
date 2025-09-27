@@ -11,49 +11,135 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Image as ImageIcon, X } from "lucide-react";
+import { Image as ImageIcon, X, Check, ChevronsUpDown } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { optimizeMedia, type OptimizeOptions } from "@/lib/media-optimizer";
 
-type MediaItem = {
-  file: File;
-  url: string;
-};
-
+type MediaItem = { file: File; url: string };
 type VideoOptions = NonNullable<OptimizeOptions["video"]>;
 
-// Pre-made options for a prompt-engineering community
-const MODEL_OPTIONS = [
-  // Text models
-  { value: "openai-gpt-4o", label: "OpenAI — GPT‑4o" },
-  { value: "openai-gpt-4o-mini", label: "OpenAI — GPT‑4o mini" },
-  { value: "openai-o4-mini", label: "OpenAI — o4 mini" },
-  {
-    value: "anthropic-claude-3-5-sonnet",
-    label: "Anthropic — Claude 3.5 Sonnet",
-  },
-  {
-    value: "anthropic-claude-3-5-haiku",
-    label: "Anthropic — Claude 3.5 Haiku",
-  },
-  { value: "google-gemini-1-5-pro", label: "Google — Gemini 1.5 Pro" },
-  { value: "google-gemini-1-5-flash", label: "Google — Gemini 1.5 Flash" },
-  { value: "meta-llama-3-1-8b", label: "Meta — Llama 3.1 8B Instruct" },
-  { value: "meta-llama-3-1-70b", label: "Meta — Llama 3.1 70B Instruct" },
-  { value: "mistral-large", label: "Mistral — Mistral Large" },
-  { value: "cohere-command-r-plus", label: "Cohere — Command R+" },
-  { value: "perplexity-sonar-large", label: "Perplexity — Sonar Large" },
-  { value: "xai-grok-2", label: "xAI — Grok‑2" },
-  // Image models (still useful for prompt sharing)
-  { value: "openai-dalle-3", label: "OpenAI — DALL·E 3 (image)" },
-  { value: "midjourney-v6", label: "Midjourney v6 (image)" },
-  { value: "stability-sdxl", label: "Stable Diffusion XL (image)" },
-  { value: "flux-1-1", label: "Flux 1.1 (image)" },
-  { value: "ideogram-1", label: "Ideogram 1 (image)" },
-  { value: "playground-v2-5", label: "Playground v2.5 (image)" },
-  { value: "others", label: "Others" },
+/* Providers */
+const PROVIDERS = [
+  { id: "openai", label: "OpenAI" },
+  { id: "anthropic", label: "Anthropic" },
+  { id: "google", label: "Google" },
+  { id: "meta", label: "Meta" },
+  { id: "mistral", label: "Mistral" },
+  { id: "cohere", label: "Cohere" },
+  { id: "perplexity", label: "Perplexity" },
+  { id: "xai", label: "xAI" },
+  { id: "stability", label: "Stability AI" },
+  { id: "midjourney", label: "Midjourney" },
+  { id: "ideogram", label: "Ideogram" },
+  { id: "playground", label: "Playground" },
+  { id: "others", label: "Others" },
 ] as const;
+
+type ModelInfo = {
+  key: string;
+  label: string;
+  kind:
+    | "text"
+    | "image"
+    | "multimodal"
+    | "reasoning"
+    | "audio"
+    | "video"
+    | "custom";
+};
+
+const MODELS_BY_PROVIDER: Record<string, ModelInfo[]> = {
+  openai: [
+    { key: "gpt-4o", label: "GPT‑4o", kind: "multimodal" },
+    { key: "gpt-4o-mini", label: "GPT‑4o mini", kind: "multimodal" },
+    { key: "o4-mini", label: "o4 mini", kind: "reasoning" },
+    { key: "dall-e-3", label: "DALL·E 3", kind: "image" },
+    { key: "other", label: "Other (custom)", kind: "custom" },
+  ],
+  anthropic: [
+    {
+      key: "claude-3-5-sonnet",
+      label: "Claude 3.5 Sonnet",
+      kind: "multimodal",
+    },
+    { key: "claude-3-5-haiku", label: "Claude 3.5 Haiku", kind: "multimodal" },
+    { key: "other", label: "Other (custom)", kind: "custom" },
+  ],
+  google: [
+    { key: "gemini-1-5-pro", label: "Gemini 1.5 Pro", kind: "multimodal" },
+    { key: "gemini-1-5-flash", label: "Gemini 1.5 Flash", kind: "multimodal" },
+    { key: "other", label: "Other (custom)", kind: "custom" },
+  ],
+  meta: [
+    {
+      key: "llama-3-1-8b-instruct",
+      label: "Llama 3.1 8B Instruct",
+      kind: "text",
+    },
+    {
+      key: "llama-3-1-70b-instruct",
+      label: "Llama 3.1 70B Instruct",
+      kind: "text",
+    },
+    { key: "other", label: "Other (custom)", kind: "custom" },
+  ],
+  mistral: [
+    { key: "mistral-large", label: "Mistral Large", kind: "text" },
+    {
+      key: "mixtral-8x7b-instruct",
+      label: "Mixtral 8x7B Instruct",
+      kind: "text",
+    },
+    { key: "other", label: "Other (custom)", kind: "custom" },
+  ],
+  cohere: [
+    { key: "command-r-plus", label: "Command R+", kind: "text" },
+    { key: "command-r", label: "Command R", kind: "text" },
+    { key: "other", label: "Other (custom)", kind: "custom" },
+  ],
+  perplexity: [
+    { key: "sonar-large", label: "Sonar Large", kind: "text" },
+    { key: "sonar-small", label: "Sonar Small", kind: "text" },
+    { key: "other", label: "Other (custom)", kind: "custom" },
+  ],
+  xai: [
+    { key: "grok-2", label: "Grok‑2", kind: "text" },
+    { key: "other", label: "Other (custom)", kind: "custom" },
+  ],
+  stability: [
+    { key: "sdxl", label: "Stable Diffusion XL (SDXL)", kind: "image" },
+    { key: "sd3-medium", label: "Stable Diffusion 3 Medium", kind: "image" },
+    { key: "sd3-large", label: "Stable Diffusion 3 Large", kind: "image" },
+    { key: "other", label: "Other (custom)", kind: "custom" },
+  ],
+  midjourney: [
+    { key: "v6", label: "Midjourney v6", kind: "image" },
+    { key: "other", label: "Other (custom)", kind: "custom" },
+  ],
+  ideogram: [
+    { key: "ideogram-1", label: "Ideogram 1", kind: "image" },
+    { key: "other", label: "Other (custom)", kind: "custom" },
+  ],
+  playground: [
+    { key: "playground-v2-5", label: "Playground v2.5", kind: "image" },
+    { key: "other", label: "Other (custom)", kind: "custom" },
+  ],
+  others: [],
+};
 
 const CATEGORY_OPTIONS = [
   "Text Generation",
@@ -196,13 +282,8 @@ const SUB_CATEGORIES: Record<(typeof CATEGORY_OPTIONS)[number], string[]> = {
 export default function DashboardCreatePage() {
   const MAX_FILES = 4;
   const IMAGE_MAX_MB = 5;
-  const VIDEO_RAW_MAX_MB = 10; // videos currently disabled
   const VIDEO_TARGET_MB = 1;
-
   const IMAGE_MAX_BYTES = IMAGE_MAX_MB * 1024 * 1024;
-  const VIDEO_RAW_MAX_BYTES = VIDEO_RAW_MAX_MB * 1024 * 1024;
-  const VIDEO_TARGET_BYTES = VIDEO_TARGET_MB * 1024 * 1024;
-
   const MAX_CHARS = 2000;
 
   const [text, setText] = React.useState("");
@@ -211,22 +292,24 @@ export default function DashboardCreatePage() {
 
   const [isDragging, setIsDragging] = React.useState(false);
   const [isOptimizing, setIsOptimizing] = React.useState(false);
-  const [optState, setOptState] = React.useState<{
-    total: number;
-    currentIndex: number;
-    currentPercent: number;
-    fileName: string | null;
-  }>({ total: 0, currentIndex: 0, currentPercent: 0, fileName: null });
+  const [optState, setOptState] = React.useState({
+    total: 0,
+    currentIndex: 0,
+    currentPercent: 0,
+    fileName: null as string | null,
+  });
 
   const [tags, setTags] = React.useState<string[]>([]);
   const [tagInput, setTagInput] = React.useState("");
 
-  const [model, setModel] = React.useState<string>("");
+  const [provider, setProvider] = React.useState<string>("");
+  const [customProvider, setCustomProvider] = React.useState<string>("");
+  const [modelKey, setModelKey] = React.useState<string>("");
   const [customModel, setCustomModel] = React.useState<string>("");
+  const [modelOpen, setModelOpen] = React.useState(false);
 
   const [category, setCategory] = React.useState<string>("Text Generation");
   const [customCategory, setCustomCategory] = React.useState<string>("");
-
   const [subCategory, setSubCategory] = React.useState<string>("");
   const [customSubCategory, setCustomSubCategory] = React.useState<string>("");
 
@@ -234,8 +317,8 @@ export default function DashboardCreatePage() {
 
   const remaining = MAX_CHARS - text.length;
 
-  // Tag helpers (lowercase + hyphens, unique, max 5)
-  const slugifyTag = (raw: string) =>
+  // Tag helpers
+  const toSlug = (raw: string) =>
     raw
       .toLowerCase()
       .trim()
@@ -243,6 +326,8 @@ export default function DashboardCreatePage() {
       .replace(/[^a-z0-9-]/g, "")
       .replace(/-+/g, "-")
       .replace(/^-+|-+$/g, "");
+
+  const slugifyTag = (raw: string) => toSlug(raw);
 
   const addTag = (raw: string) => {
     if (!raw) return;
@@ -265,7 +350,7 @@ export default function DashboardCreatePage() {
       .map(slugifyTag)
       .filter(Boolean);
     if (!parts.length) return;
-    let toAdd: string[] = [];
+    const toAdd: string[] = [];
     for (const p of parts) {
       if (toAdd.includes(p) || tags.includes(p)) continue;
       if (tags.length + toAdd.length >= 5) break;
@@ -284,7 +369,7 @@ export default function DashboardCreatePage() {
       tagInput.trim()
     ) {
       e.preventDefault();
-      addTag(tagInput);
+  addTag(tagInput);
       setTagInput("");
     } else if (e.key === "Backspace" && !tagInput && tags.length) {
       setTags((prev) => prev.slice(0, -1));
@@ -296,7 +381,6 @@ export default function DashboardCreatePage() {
   // Media
   const addFiles = async (files: File[]) => {
     setError(null);
-
     const currentCount = media.length;
     if (currentCount >= MAX_FILES) {
       const msg = `You can attach up to ${MAX_FILES} files.`;
@@ -304,7 +388,6 @@ export default function DashboardCreatePage() {
       toast.error(msg);
       return;
     }
-
     const availableSlots = MAX_FILES - currentCount;
     const picked = files.slice(0, availableSlots);
 
@@ -315,13 +398,9 @@ export default function DashboardCreatePage() {
     for (const f of picked) {
       if (f.type.startsWith("video/")) {
         rejectedVideos++;
-        continue;
       } else if (f.type.startsWith("image/")) {
-        if (f.size > IMAGE_MAX_BYTES) {
-          rejectedImages++;
-          continue;
-        }
-        valid.push(f);
+        if (f.size > IMAGE_MAX_BYTES) rejectedImages++;
+        else valid.push(f);
       }
     }
 
@@ -351,26 +430,16 @@ export default function DashboardCreatePage() {
 
     for (let i = 0; i < valid.length; i++) {
       const file = valid[i];
-      const isVideo = file.type.startsWith("video/");
-      const perFileTargetBytes = isVideo ? VIDEO_TARGET_BYTES : IMAGE_MAX_BYTES;
+      const perFileTargetBytes = IMAGE_MAX_BYTES;
 
-      setOptState({
-        total: valid.length,
+      setOptState((s) => ({
+        ...s,
         currentIndex: i,
         currentPercent: 0,
         fileName: file.name,
-      });
+      }));
 
-      const baseVideo: VideoOptions = {
-        maxWidth: 960,
-        maxHeight: 960,
-        fps: 24,
-        preset: "medium",
-        attempts: 5,
-        audioBitrate: "48k",
-      };
-
-      const runOptimize = (vOverride?: Partial<VideoOptions>) =>
+      const runOptimize = () =>
         optimizeMedia(
           file,
           {
@@ -378,9 +447,6 @@ export default function DashboardCreatePage() {
             maxImageHeight: 2048,
             imageQuality: 0.82,
             maxBytes: perFileTargetBytes,
-            ...(isVideo
-              ? { video: { ...baseVideo, ...(vOverride || {}) } }
-              : {}),
           },
           (p) => {
             const pct = Math.max(0, Math.min(100, Math.round(p * 100)));
@@ -397,21 +463,6 @@ export default function DashboardCreatePage() {
       let optimized = result.file;
 
       setOptState((s) => ({ ...s, currentPercent: 100 }));
-
-      if (isVideo && optimized.size > perFileTargetBytes) {
-        const fallback = await runOptimize({
-          maxWidth: 640,
-          maxHeight: 640,
-          fps: 18,
-          audioBitrate: "32k",
-          preset: "medium",
-          attempts: 6,
-        });
-        if (fallback.file.size < optimized.size) {
-          result = fallback;
-          optimized = fallback.file;
-        }
-      }
 
       if (optimized.size > perFileTargetBytes) {
         skippedAfterCompress = true;
@@ -478,8 +529,15 @@ export default function DashboardCreatePage() {
 
   // Validation
   const promptValid = text.trim().length > 0 && remaining >= 0;
-  const modelValid =
-    model && (model !== "others" || customModel.trim().length > 0);
+  const providerValid =
+    provider && (provider !== "others" || customProvider.trim().length > 0);
+  const modelSelectionValid =
+    (provider === "others" && customModel.trim().length > 0) ||
+    (provider !== "others" &&
+      modelKey &&
+      (modelKey !== "other" || customModel.trim().length > 0));
+  const modelValid = !!providerValid && !!modelSelectionValid;
+
   const categoryValid =
     category && (category !== "Others" || customCategory.trim().length > 0);
   const subCategoryValid =
@@ -491,8 +549,19 @@ export default function DashboardCreatePage() {
 
   const requiredOk =
     promptValid && modelValid && categoryValid && subCategoryValid && tagsValid;
-
   const canPost = requiredOk && !isOptimizing;
+
+  const providerLabel =
+    provider === "others"
+      ? customProvider.trim()
+      : PROVIDERS.find((p) => p.id === provider)?.label || "";
+  const selectedModelLabel =
+    provider === "others"
+      ? customModel.trim()
+      : modelKey === "other"
+      ? customModel.trim()
+      : MODELS_BY_PROVIDER[provider]?.find((m) => m.key === modelKey)?.label ||
+        "";
 
   const handlePost = async () => {
     if (!requiredOk) {
@@ -503,21 +572,52 @@ export default function DashboardCreatePage() {
     if (isOptimizing) return;
 
     setError(null);
-
     try {
+      const providerSlug =
+        provider === "others" ? toSlug(customProvider) : provider;
+      const providerModels = MODELS_BY_PROVIDER[provider] || [];
+      const selectedPresetModel = providerModels.find(
+        (m) => m.key === modelKey
+      );
+      const resolvedModelLabel = selectedModelLabel.trim();
+      const resolvedModelKey =
+        provider === "others" || modelKey === "other"
+          ? toSlug(customModel)
+          : modelKey;
+      const resolvedModelKind =
+        provider === "others"
+          ? "custom"
+          : selectedPresetModel?.kind || (resolvedModelKey ? "custom" : "");
+
+      const resolvedCategory =
+        category === "Others" ? customCategory.trim() : category;
+      const resolvedSubCategory =
+        category === "Others" || subCategory === "others"
+          ? customSubCategory.trim()
+          : subCategory;
+      const categorySlug = toSlug(resolvedCategory);
+      const subCategorySlug = toSlug(resolvedSubCategory);
+
+      const combinedModelName = [providerLabel, resolvedModelLabel]
+        .filter(Boolean)
+        .join(" > ")
+        .trim();
+
       const form = new FormData();
       form.append("text", text.trim());
-      form.append(
-        "category",
-        category === "Others" ? customCategory.trim() : category
-      );
-      form.append(
-        "subCategory",
-        subCategory === "others" || category === "Others"
-          ? customSubCategory.trim()
-          : subCategory
-      );
-      form.append("modelName", model === "others" ? customModel.trim() : model);
+      form.append("modelName", combinedModelName);
+      form.append("category", resolvedCategory);
+      form.append("subCategory", resolvedSubCategory);
+      if (categorySlug) form.append("categorySlug", categorySlug);
+      if (subCategorySlug)
+        form.append("subCategorySlug", subCategorySlug);
+      form.append("modelProviderLabel", providerLabel);
+      if (providerSlug) form.append("modelProviderSlug", providerSlug);
+      if (resolvedModelKey) form.append("modelKey", resolvedModelKey);
+      if (resolvedModelLabel)
+        form.append("modelLabel", resolvedModelLabel);
+      if (resolvedModelKind)
+        form.append("modelKind", resolvedModelKind);
       form.append("tags", JSON.stringify(tags));
       media.forEach((m) => form.append("files", m.file));
 
@@ -543,7 +643,9 @@ export default function DashboardCreatePage() {
     setText("");
     clearAllMedia();
     setTags([]);
-    setModel("");
+    setProvider("");
+    setCustomProvider("");
+    setModelKey("");
     setCustomModel("");
     setCategory("Text Generation");
     setCustomCategory("");
@@ -555,7 +657,7 @@ export default function DashboardCreatePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Sticky header with single CTA and global progress */}
+      {/* Sticky header */}
       <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
           <h1 className="text-base font-semibold tracking-tight">Create</h1>
@@ -588,10 +690,9 @@ export default function DashboardCreatePage() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-6 md:py-8">
-        {/* Two-column on desktop, stacked on mobile. No cards. */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-8">
           {/* Left: Prompt + Media */}
-          <section className="md:col-span-2">
+          <section>
             {/* Prompt */}
             <div className="pb-6 border-b">
               <label className="text-sm font-medium flex items-center gap-1">
@@ -736,19 +837,19 @@ export default function DashboardCreatePage() {
             </div>
           </section>
 
-          {/* Right: Required details */}
-          <aside className="md:col-span-1 md:border-l md:pl-6 space-y-6">
+          {/* Right: Details */}
+          <aside className="md:border-l md:pl-8 space-y-8">
             {/* Tags */}
-            <div>
+            <div className="space-y-2">
               <label className="text-sm font-medium flex items-center gap-1">
                 Tags <span className="text-destructive">*</span>
               </label>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Add up to 5 tags. We’ll convert to lowercase-with-hyphens.
               </p>
               <div
                 className={cn(
-                  "mt-2 flex flex-wrap items-center gap-2 rounded-md border p-2",
+                  "mt-1.5 flex flex-wrap items-center gap-2 rounded-md border px-2 py-2",
                   showErrors && !tagsValid && "ring-1 ring-destructive"
                 )}
                 aria-invalid={showErrors && !tagsValid}
@@ -756,7 +857,7 @@ export default function DashboardCreatePage() {
                 {tags.map((tag, idx) => (
                   <span
                     key={idx}
-                    className="px-2 py-1 rounded-full text-xs border bg-muted/60 flex items-center gap-1"
+                    className="px-2 h-7 leading-7 rounded-full text-xs border bg-muted/60 flex items-center gap-1"
                   >
                     #{tag}
                     <button
@@ -769,7 +870,7 @@ export default function DashboardCreatePage() {
                     </button>
                   </span>
                 ))}
-                <input
+                <Input
                   type="text"
                   value={tagInput}
                   onChange={(e) => setTagInput(e.target.value)}
@@ -788,175 +889,412 @@ export default function DashboardCreatePage() {
                     }
                   }}
                   placeholder="Add tag and press Enter"
-                  className="min-w-[140px] flex-1 bg-transparent outline-none text-sm placeholder:text-muted-foreground"
+                  className="h-9 min-w-[120px] flex-1 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
                   disabled={isOptimizing || tags.length >= 5}
                 />
               </div>
-              <div className="mt-1 flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">
-                  {tags.length}/5
-                </span>
-                {showErrors && !tagsValid && (
-                  <span className="text-xs text-destructive">
-                    At least 1 tag required (max 5).
-                  </span>
-                )}
-              </div>
+              {/* Custom Provider/Model panel when provider = Others */}
+              {provider === "others" ? (
+                <div className="mt-1 rounded-md border bg-muted/30 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-medium">Custom model</span>
+                    <Button
+                      type="button"
+                      variant="link"
+                      size="sm"
+                      className="h-7 px-0"
+                      onClick={() => {
+                        setProvider("");
+                        setCustomProvider("");
+                        setModelKey("");
+                        setCustomModel("");
+                      }}
+                    >
+                      Back to presets
+                    </Button>
+                  </div>
+                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Input
+                      placeholder="Provider (e.g., OpenAI)"
+                      value={customProvider}
+                      onChange={(e) => setCustomProvider(e.target.value)}
+                      disabled={isOptimizing}
+                      className={cn(
+                        "h-9",
+                        showErrors &&
+                          !providerValid &&
+                          "ring-1 ring-destructive"
+                      )}
+                      aria-invalid={showErrors && !providerValid}
+                    />
+                    <Input
+                      placeholder="Model (e.g., GPT-4o)"
+                      value={customModel}
+                      onChange={(e) => setCustomModel(e.target.value)}
+                      disabled={isOptimizing}
+                      className={cn(
+                        "h-9",
+                        showErrors &&
+                          !modelSelectionValid &&
+                          "ring-1 ring-destructive"
+                      )}
+                      aria-invalid={showErrors && !modelSelectionValid}
+                    />
+                  </div>
+                  {showErrors && !modelValid && (
+                    <p className="mt-2 text-xs text-destructive">
+                      Please enter provider and model.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
+                    {/* Provider */}
+                    <div className="space-y-1">
+                      <span className="text-xs text-muted-foreground">
+                        Provider
+                      </span>
+                      <Select
+                        value={provider}
+                        onValueChange={(val) => {
+                          setProvider(val);
+                          setModelKey("");
+                          setCustomModel("");
+                          if (val !== "others") setCustomProvider("");
+                        }}
+                        disabled={isOptimizing}
+                      >
+                        <SelectTrigger
+                          className={cn(
+                            "h-9",
+                            showErrors &&
+                              !providerValid &&
+                              "ring-1 ring-destructive"
+                          )}
+                          aria-invalid={showErrors && !providerValid}
+                        >
+                          <SelectValue placeholder="Select provider" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PROVIDERS.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Model combobox */}
+                    <div className="space-y-1 min-w-0">
+                      <span className="text-xs text-muted-foreground">
+                        Model
+                      </span>
+                      <Popover open={modelOpen} onOpenChange={setModelOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={modelOpen}
+                            className={cn(
+                              "h-9 w-full justify-between text-left font-normal min-w-0",
+                              showErrors &&
+                                !modelSelectionValid &&
+                                "ring-1 ring-destructive"
+                            )}
+                            disabled={isOptimizing || !provider}
+                          >
+                            <span className="truncate">
+                              {modelKey
+                                ? MODELS_BY_PROVIDER[provider]?.find(
+                                    (m) => m.key === modelKey
+                                  )?.label ||
+                                  (modelKey === "other"
+                                    ? "Other (custom)"
+                                    : "Select a model")
+                                : "Select a model"}
+                            </span>
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                          align="start"
+                          className="p-0 w-[min(90vw,380px)]"
+                        >
+                          <Command>
+                            <CommandInput placeholder="Search models..." />
+                            <CommandEmpty>No model found.</CommandEmpty>
+                            <CommandList>
+                              <CommandGroup
+                                heading={`${
+                                  provider
+                                    ? PROVIDERS.find((p) => p.id === provider)
+                                        ?.label ?? "Provider"
+                                    : "Provider"
+                                } models`}
+                              >
+                                {(MODELS_BY_PROVIDER[provider] || []).map(
+                                  (m) => (
+                                    <CommandItem
+                                      key={m.key}
+                                      value={m.label}
+                                      onSelect={() => {
+                                        setModelKey(m.key);
+                                        if (m.key !== "other")
+                                          setCustomModel("");
+                                        setModelOpen(false);
+                                      }}
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          modelKey === m.key
+                                            ? "opacity-100"
+                                            : "opacity-0"
+                                        )}
+                                      />
+                                      <span className="truncate">
+                                        {m.label}
+                                      </span>
+                                      <span className="ml-auto text-xs rounded px-1.5 py-0.5 border bg-muted text-muted-foreground">
+                                        {m.kind}
+                                      </span>
+                                    </CommandItem>
+                                  )
+                                )}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+
+                  {/* Inline custom model input when "Other (custom)" is chosen for a preset provider */}
+                  {provider && modelKey === "other" && (
+                    <div className="mt-2 rounded-md border bg-muted/30 p-2 flex flex-col gap-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-medium">
+                          Custom model for{" "}
+                          {PROVIDERS.find((p) => p.id === provider)?.label}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="link"
+                          size="sm"
+                          className="h-7 px-0"
+                          onClick={() => {
+                            setModelKey("");
+                            setCustomModel("");
+                          }}
+                        >
+                          Back to list
+                        </Button>
+                      </div>
+                      <Input
+                        placeholder="Enter custom model"
+                        value={customModel}
+                        onChange={(e) => setCustomModel(e.target.value)}
+                        disabled={isOptimizing}
+                        className={cn(
+                          "h-9",
+                          showErrors &&
+                            !modelSelectionValid &&
+                            "ring-1 ring-destructive"
+                        )}
+                        aria-invalid={showErrors && !modelSelectionValid}
+                      />
+                    </div>
+                  )}
+
+                  {showErrors && !modelValid && (
+                    <p className="text-xs text-destructive mt-1">
+                      Please select a provider and model (or enter a custom
+                      value).
+                    </p>
+                  )}
+                </>
+              )}
             </div>
 
-            {/* Model */}
-            <div>
-              <label className="text-sm font-medium flex items-center gap-1">
-                AI Model <span className="text-destructive">*</span>
-              </label>
-              <div className="mt-2 space-y-2">
-                <Select
-                  value={model}
-                  onValueChange={setModel}
-                  disabled={isOptimizing}
-                >
-                  <SelectTrigger
-                    className={cn(
-                      showErrors && !modelValid && "ring-1 ring-destructive"
-                    )}
-                    aria-invalid={showErrors && !modelValid}
-                  >
-                    <SelectValue placeholder="Select a model" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {MODEL_OPTIONS.map((m) => (
-                      <SelectItem key={m.value} value={m.value}>
-                        {m.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {model === "others" && (
-                  <Input
-                    placeholder="Enter custom model"
-                    value={customModel}
-                    onChange={(e) => setCustomModel(e.target.value)}
-                    disabled={isOptimizing}
-                    className={cn(
-                      showErrors && !modelValid && "ring-1 ring-destructive"
-                    )}
-                    aria-invalid={showErrors && !modelValid}
-                  />
-                )}
-                {showErrors && !modelValid && (
-                  <p className="text-xs text-destructive">
-                    Please select a model or enter a custom model.
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Category */}
-            <div>
+            {/* Category & Subcategory */}
+            <div className="space-y-2">
               <label className="text-sm font-medium flex items-center gap-1">
                 Category <span className="text-destructive">*</span>
               </label>
-              <div className="mt-2 space-y-2">
-                <Select
-                  value={category}
-                  onValueChange={(val) => {
-                    setCategory(val);
-                    setSubCategory("");
-                    setCustomSubCategory("");
-                    if (val !== "Others") setCustomCategory("");
-                  }}
-                  disabled={isOptimizing}
-                >
-                  <SelectTrigger
-                    className={cn(
-                      showErrors && !categoryValid && "ring-1 ring-destructive"
-                    )}
-                    aria-invalid={showErrors && !categoryValid}
-                  >
-                    <SelectValue placeholder="Select a category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CATEGORY_OPTIONS.map((c) => (
-                      <SelectItem key={c} value={c}>
-                        {c}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {category === "Others" && (
-                  <Input
-                    placeholder="Enter custom category"
-                    value={customCategory}
-                    onChange={(e) => setCustomCategory(e.target.value)}
-                    disabled={isOptimizing}
-                    className={cn(
-                      showErrors && !categoryValid && "ring-1 ring-destructive"
-                    )}
-                    aria-invalid={showErrors && !categoryValid}
-                  />
-                )}
-                {showErrors && !categoryValid && (
-                  <p className="text-xs text-destructive">
-                    Category is required.
-                  </p>
-                )}
-              </div>
-            </div>
 
-            {/* Subcategory */}
-            <div>
-              <label className="text-sm font-medium flex items-center gap-1">
-                Subcategory <span className="text-destructive">*</span>
-              </label>
-              <div className="mt-2 space-y-2">
-                {category !== "Others" ? (
-                  <Select
-                    value={subCategory}
-                    onValueChange={setSubCategory}
-                    disabled={isOptimizing}
-                  >
-                    <SelectTrigger
+              {/* Custom Category panel when category = Others */}
+              {category === "Others" ? (
+                <div className="mt-1 rounded-md border bg-muted/30 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-medium">Custom category</span>
+                    <Button
+                      type="button"
+                      variant="link"
+                      size="sm"
+                      className="h-7 px-0"
+                      onClick={() => {
+                        setCategory("");
+                        setCustomCategory("");
+                        setSubCategory("");
+                        setCustomSubCategory("");
+                      }}
+                    >
+                      Back to presets
+                    </Button>
+                  </div>
+                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Input
+                      placeholder="Category name"
+                      value={customCategory}
+                      onChange={(e) => setCustomCategory(e.target.value)}
+                      disabled={isOptimizing}
                       className={cn(
+                        "h-9",
+                        showErrors &&
+                          !categoryValid &&
+                          "ring-1 ring-destructive"
+                      )}
+                      aria-invalid={showErrors && !categoryValid}
+                    />
+                    <Input
+                      placeholder="Subcategory name"
+                      value={customSubCategory}
+                      onChange={(e) => setCustomSubCategory(e.target.value)}
+                      disabled={isOptimizing}
+                      className={cn(
+                        "h-9",
                         showErrors &&
                           !subCategoryValid &&
                           "ring-1 ring-destructive"
                       )}
                       aria-invalid={showErrors && !subCategoryValid}
+                    />
+                  </div>
+                  {(showErrors && !categoryValid) ||
+                  (showErrors && !subCategoryValid) ? (
+                    <p className="mt-2 text-xs text-destructive">
+                      Category and Subcategory are required.
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <Select
+                      value={category}
+                      onValueChange={(val) => {
+                        setCategory(val);
+                        setSubCategory("");
+                        setCustomSubCategory("");
+                        if (val !== "Others") setCustomCategory("");
+                      }}
+                      disabled={isOptimizing}
                     >
-                      <SelectValue placeholder="Select a subcategory" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SUB_CATEGORIES[
-                        category as keyof typeof SUB_CATEGORIES
-                      ].map((sub) => (
-                        <SelectItem key={sub} value={sub}>
-                          {sub}
-                        </SelectItem>
-                      ))}
-                      <SelectItem value="others">Others</SelectItem>
-                    </SelectContent>
-                  </Select>
-                ) : null}
-                {(category === "Others" || subCategory === "others") && (
-                  <Input
-                    placeholder="Enter custom subcategory"
-                    value={customSubCategory}
-                    onChange={(e) => setCustomSubCategory(e.target.value)}
-                    disabled={isOptimizing}
-                    className={cn(
-                      showErrors &&
-                        !subCategoryValid &&
-                        "ring-1 ring-destructive"
+                      <SelectTrigger
+                        className={cn(
+                          "h-9",
+                          showErrors &&
+                            !categoryValid &&
+                            "ring-1 ring-destructive"
+                        )}
+                        aria-invalid={showErrors && !categoryValid}
+                      >
+                        <SelectValue placeholder="Select a category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CATEGORY_OPTIONS.map((c) => (
+                          <SelectItem key={c} value={c}>
+                            {c}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    {/* Subcategory select */}
+                    <div className="space-y-1">
+                      <span className="text-xs text-muted-foreground">
+                        Subcategory
+                      </span>
+                      <Select
+                        value={subCategory}
+                        onValueChange={setSubCategory}
+                        disabled={isOptimizing}
+                      >
+                        <SelectTrigger
+                          className={cn(
+                            "h-9",
+                            showErrors &&
+                              !subCategoryValid &&
+                              "ring-1 ring-destructive"
+                          )}
+                          aria-invalid={showErrors && !subCategoryValid}
+                        >
+                          <SelectValue placeholder="Select a subcategory" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {SUB_CATEGORIES[
+                            category as keyof typeof SUB_CATEGORIES
+                          ].map((sub) => (
+                            <SelectItem key={sub} value={sub}>
+                              {sub}
+                            </SelectItem>
+                          ))}
+                          <SelectItem value="others">Others</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Inline custom subcategory input when "Others" chosen in subcategory */}
+                    {subCategory === "others" && (
+                      <div className="rounded-md border bg-muted/30 p-2 mt-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-medium">
+                            Custom subcategory
+                          </span>
+                          <Button
+                            type="button"
+                            variant="link"
+                            size="sm"
+                            className="h-7 px-0"
+                            onClick={() => {
+                              setSubCategory("");
+                              setCustomSubCategory("");
+                            }}
+                          >
+                            Back to list
+                          </Button>
+                        </div>
+                        <Input
+                          placeholder="Enter custom subcategory"
+                          value={customSubCategory}
+                          onChange={(e) => setCustomSubCategory(e.target.value)}
+                          disabled={isOptimizing}
+                          className={cn(
+                            "h-9 mt-2",
+                            showErrors &&
+                              !subCategoryValid &&
+                              "ring-1 ring-destructive"
+                          )}
+                          aria-invalid={showErrors && !subCategoryValid}
+                        />
+                      </div>
                     )}
-                    aria-invalid={showErrors && !subCategoryValid}
-                  />
-                )}
-                {showErrors && !subCategoryValid && (
-                  <p className="text-xs text-destructive">
-                    Subcategory is required.
-                  </p>
-                )}
-              </div>
+
+                    {showErrors && !categoryValid && (
+                      <p className="text-xs text-destructive">
+                        Category is required.
+                      </p>
+                    )}
+                    {showErrors && !subCategoryValid && (
+                      <p className="text-xs text-destructive">
+                        Subcategory is required.
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </aside>
         </div>
