@@ -224,26 +224,14 @@ function Lightbox({
               src={current}
               controls
               playsInline
-              className="
-                block
-                w-auto h-auto
-                max-h-[92dvh]
-                max-w-[92vw] md:max-w-[85vw] lg:max-w-[75vw] xl:max-w-[1200px]
-                object-contain
-              "
+              className="block w-auto h-auto max-h-[92dvh] max-w-[92vw] md:max-w-[85vw] lg:max-w-[75vw] xl:max-w-[1200px] object-cover"
             />
           ) : (
             <img
               src={current}
               alt="media"
               draggable={false}
-              className="
-                block
-                w-auto h-auto
-                max-h-[92dvh]
-                max-w-[92vw] md:max-w-[85vw] lg:max-w-[75vw] xl:max-w-[1200px]
-                select-none
-              "
+              className="block w-auto h-auto max-h-[92dvh] max-w-[92vw] md:max-w-[85vw] lg:max-w-[75vw] xl:max-w-[1200px] select-none object-cover"
             />
           )}
         </div>
@@ -292,7 +280,7 @@ function MediaInline({
             controls
             playsInline
             preload="metadata"
-            className="w-full h-auto max-h-[80dvh] bg-black"
+            className="w-full h-auto max-h-[80dvh] bg-black object-cover"
           />
         </div>
       );
@@ -308,7 +296,7 @@ function MediaInline({
         <img
           src={url}
           alt="media"
-          className="w-full h-auto max-h-[80dvh] select-none"
+          className="w-full h-auto max-h-[80dvh] select-none object-cover"
           draggable={false}
         />
       </button>
@@ -330,7 +318,7 @@ function MediaInline({
             controls
             playsInline
             preload="metadata"
-            className="w-full h-auto max-h-[75dvh] bg-black"
+            className="w-full h-auto max-h-[75dvh] bg-black object-cover"
           />
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
@@ -338,7 +326,7 @@ function MediaInline({
             key={current}
             src={current}
             alt="media"
-            className="w-full h-auto max-h-[75dvh] select-none"
+            className="w-full h-auto max-h-[75dvh] select-none object-cover"
             draggable={false}
             onClick={() => onOpenViewer(active)}
           />
