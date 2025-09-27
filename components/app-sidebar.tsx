@@ -46,7 +46,7 @@ export async function AppSidebar() {
   return (
     <Sidebar
       collapsible="icon"
-      className="bg-sidebar text-sidebar-foreground border-r border-sidebar-border shadow-sm"
+      className="bg-sidebar text-sidebar-foreground border-r border-sidebar-border shadow-sm md:flex hidden"
     >
       <SidebarRail />
 

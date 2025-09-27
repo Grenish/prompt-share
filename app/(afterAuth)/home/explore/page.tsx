@@ -13,7 +13,7 @@ import {
   type ExploreTag,
   searchExploreTagsByName,
   searchDistinctOtherModels,
-} from "@/util/actions/exploreAction";
+} from "@/util/actions/exploreClient";
 import HashTagsSkeleton from "@/components/explore/skeleton/hashtags-skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
