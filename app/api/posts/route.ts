@@ -5,10 +5,17 @@ export async function POST(req: Request) {
   try {
     const form = await req.formData();
 
-    const text = String(form.get("text") ?? "");
-    const category = String(form.get("category") ?? "");
-    const subCategory = String(form.get("subCategory") ?? "");
-    const modelName = String(form.get("modelName") ?? "");
+  const text = String(form.get("text") ?? "");
+  const category = String(form.get("category") ?? "");
+  const subCategory = String(form.get("subCategory") ?? "");
+  const modelName = String(form.get("modelName") ?? "");
+  const categorySlug = String(form.get("categorySlug") ?? "");
+  const subCategorySlug = String(form.get("subCategorySlug") ?? "");
+  const modelProviderLabel = String(form.get("modelProviderLabel") ?? "");
+  const modelProviderSlug = String(form.get("modelProviderSlug") ?? "");
+  const modelKey = String(form.get("modelKey") ?? "");
+  const modelLabel = String(form.get("modelLabel") ?? "");
+  const modelKind = String(form.get("modelKind") ?? "");
 
     let tags: string[] = [];
     const tagsRaw = form.get("tags");
@@ -28,7 +35,21 @@ export async function POST(req: Request) {
       }
     }
 
-    const result = await postAction({ text, files, category, subCategory, modelName, tags });
+    const result = await postAction({
+      text,
+      files,
+      category,
+      subCategory,
+      modelName,
+      tags,
+      categorySlug,
+      subCategorySlug,
+      modelProviderLabel,
+      modelProviderSlug,
+      modelKey,
+      modelLabel,
+      modelKind,
+    });
     if (!result.ok) {
       return NextResponse.json({ ok: false, error: result.error }, { status: 400 });
     }

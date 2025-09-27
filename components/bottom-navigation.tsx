@@ -2,16 +2,23 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Award, Home, Search, Plus, User as UserIcon } from "lucide-react";
+import {
+  Award,
+  Home,
+  Search,
+  Plus,
+  User as UserIcon,
+  Bell,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Compact, minimal nav config
 const navItems = [
   { title: "Home", href: "/home", icon: Home },
   { title: "Explore", href: "/home/explore", icon: Search },
-  { title: "Create", href: "/home/create", icon: Plus, special: true },
   { title: "Leaderboard", href: "/home/leaderboard", icon: Award },
+  { title: "Notifications", href: "/home/notifications", icon: Bell },
   { title: "Profile", href: "/home/profile", icon: UserIcon },
+  { title: "Create", href: "/home/create", icon: Plus, special: true },
 ];
 
 export default function BottomNavigation() {
@@ -34,7 +41,6 @@ export default function BottomNavigation() {
           {navItems.map((item) => {
             const active = isActive(item.href, item.title);
 
-            // Common button styles
             const baseBtn = cn(
               "relative inline-flex items-center justify-center",
               "h-10 w-10 rounded-md transition-colors",
@@ -42,13 +48,11 @@ export default function BottomNavigation() {
               active && "text-primary bg-primary/10"
             );
 
-            // Subtle active dot
             const ActiveDot = active ? (
               <span className="pointer-events-none absolute -bottom-1 h-1 w-1 rounded-full bg-primary" />
             ) : null;
 
             if (item.special) {
-              // Minimal "Create" — same size as others, subtle emphasis
               return (
                 <li key={item.title}>
                   <Link
@@ -56,7 +60,7 @@ export default function BottomNavigation() {
                     aria-label={item.title}
                     className={cn(
                       baseBtn,
-                      "border border-primary/20 text-primary hover:bg-primary/10"
+                      "border border-primary/20 text-primary hover:bg-primary/10",
                     )}
                   >
                     <item.icon className="h-[20px] w-[20px]" />

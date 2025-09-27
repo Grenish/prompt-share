@@ -9,24 +9,20 @@ import {
   HeartIcon,
   UserPlusIcon,
   ClockIcon,
+  MessageCircleIcon,
+  Repeat2Icon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type {
+  AppNotification,
+  NotificationCategory,
+} from "@/lib/notifications";
 
-export interface NotificationItem {
-  id: string;
-  message: string;
-  read?: boolean;
-  timestamp?: string;
-  category?: "mention" | "like" | "follow" | "system";
-  icon?: React.ReactNode;
-}
+export type NotificationItem = AppNotification;
 
 export type NotificationFilterType =
   | "all"
-  | "mention"
-  | "like"
-  | "follow"
-  | "system";
+  | Extract<NotificationCategory, "mention" | "like" | "follow" | "system">;
 
 interface NotificationCenterProps {
   notifications: NotificationItem[];
@@ -58,9 +54,14 @@ function iconStyles(category?: NotificationItem["category"], read?: boolean) {
       return "bg-rose-500/10 text-rose-500 ring-rose-500/20";
     case "mention":
       return "bg-violet-500/10 text-violet-500 ring-violet-500/20";
+    case "comment":
+      return "bg-amber-500/10 text-amber-500 ring-amber-500/20";
     case "follow":
       return "bg-blue-500/10 text-blue-500 ring-blue-500/20";
+    case "repost":
+      return "bg-emerald-500/10 text-emerald-500 ring-emerald-500/20";
     case "system":
+    case "general":
       return "bg-purple-500/10 text-purple-500 ring-purple-500/20";
     default:
       return "bg-primary/10 text-primary ring-primary/20";
@@ -220,9 +221,14 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                       <AtSignIcon className="h-5 w-5" />
                     ) : notification.category === "like" ? (
                       <HeartIcon className="h-5 w-5" />
+                    ) : notification.category === "comment" ? (
+                      <MessageCircleIcon className="h-5 w-5" />
                     ) : notification.category === "follow" ? (
                       <UserPlusIcon className="h-5 w-5" />
-                    ) : notification.category === "system" ? (
+                    ) : notification.category === "repost" ? (
+                      <Repeat2Icon className="h-5 w-5" />
+                    ) : notification.category === "system" ||
+                      notification.category === "general" ? (
                       <ClockIcon className="h-5 w-5" />
                     ) : (
                       <BellIcon className="h-5 w-5" />

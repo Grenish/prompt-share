@@ -17,6 +17,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AboutMeSection } from "@/components/profile/about-me";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
+const normalizeString = (value: unknown): string | undefined => {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
 export default async function DashboardProfilePage() {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getUser();
@@ -34,9 +40,143 @@ export default async function DashboardProfilePage() {
   // Fetch user's posts
   const { data: postRows } = await supabase
     .from("posts")
-    .select("*")
+    .select(
+      "id, created_at, text, category, category_slug, sub_category, sub_category_slug, model_name, model_label, model_key, model_kind, model_provider, model_provider_slug, media_urls, author"
+    )
     .eq("author", user!.id)
     .order("created_at", { ascending: false });
+
+  const [{ data: savedEntries }, { data: likedEntries }] = await Promise.all([
+    supabase
+      .from("post_saves")
+      .select("post_id, created_at")
+      .eq("user_id", user!.id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("post_likes")
+      .select("post_id, created_at")
+      .eq("user_id", user!.id)
+      .order("created_at", { ascending: false }),
+  ]);
+
+  const savedIds = Array.from(
+    new Set((savedEntries || []).map((row) => String(row.post_id)))
+  );
+  const likedIds = Array.from(
+    new Set((likedEntries || []).map((row) => String(row.post_id)))
+  );
+
+  const savedOrderMap = new Map<string, string>();
+  for (const row of savedEntries || []) {
+    savedOrderMap.set(String(row.post_id), row.created_at ?? "");
+  }
+
+  const likedOrderMap = new Map<string, string>();
+  for (const row of likedEntries || []) {
+    likedOrderMap.set(String(row.post_id), row.created_at ?? "");
+  }
+
+  let savedPostRows: any[] = [];
+  if (savedIds.length > 0) {
+    const { data } = await supabase
+      .from("posts")
+      .select(
+        "id, created_at, text, category, category_slug, sub_category, sub_category_slug, model_name, model_label, model_key, model_kind, model_provider, model_provider_slug, media_urls, author"
+      )
+      .in("id", savedIds);
+    savedPostRows = data || [];
+  }
+
+  let likedPostRows: any[] = [];
+  if (likedIds.length > 0) {
+    const { data } = await supabase
+      .from("posts")
+      .select(
+        "id, created_at, text, category, category_slug, sub_category, sub_category_slug, model_name, model_label, model_key, model_kind, model_provider, model_provider_slug, media_urls, author"
+      )
+      .in("id", likedIds);
+    likedPostRows = data || [];
+  }
+
+  const collectedRows = [
+    ...(postRows || []),
+    ...savedPostRows,
+    ...likedPostRows,
+  ];
+
+  const allPostIds = Array.from(
+    new Set(collectedRows.map((row: any) => String(row.id)))
+  );
+
+  const authorIds = Array.from(
+    new Set(
+      collectedRows
+        .map((row: any) => row.author)
+        .filter((value): value is string => Boolean(value))
+    )
+  );
+
+  const profilesMap = new Map<
+    string,
+    {
+      username: string | null;
+      full_name: string | null;
+      avatar_url: string | null;
+      bio?: string | null;
+    }
+  >();
+
+  if (authorIds.length > 0) {
+    const { data: authorProfiles } = await supabase
+      .from("profiles")
+      .select("id, username, full_name, avatar_url, bio")
+      .in("id", authorIds);
+
+    for (const profile of authorProfiles || []) {
+      profilesMap.set(String(profile.id), {
+        username: profile.username ?? null,
+        full_name: profile.full_name ?? null,
+        avatar_url: profile.avatar_url ?? null,
+        bio: profile.bio ?? null,
+      });
+    }
+  }
+
+  profilesMap.set(user!.id, {
+    username: profileInfo?.profile?.username ?? null,
+    full_name: user!.displayName ?? null,
+    avatar_url: user!.avatarUrl ?? null,
+    bio: profileInfo?.profile?.bio ?? null,
+  });
+
+  const likeCountMap = new Map<string, number>();
+  const commentCountMap = new Map<string, number>();
+
+  if (allPostIds.length > 0) {
+    const [{ data: likeRows }, { data: commentRows }] = await Promise.all([
+      supabase
+        .from("post_likes")
+        .select("post_id")
+        .in("post_id", allPostIds),
+      supabase
+        .from("post_comments")
+        .select("post_id")
+        .in("post_id", allPostIds),
+    ]);
+
+    for (const row of likeRows || []) {
+      const key = String(row.post_id);
+      likeCountMap.set(key, (likeCountMap.get(key) || 0) + 1);
+    }
+
+    for (const row of commentRows || []) {
+      const key = String(row.post_id);
+      commentCountMap.set(key, (commentCountMap.get(key) || 0) + 1);
+    }
+  }
+
+  const viewerLikedSet = new Set<string>(likedIds);
+  const viewerSavedSet = new Set<string>(savedIds);
 
   const imageExts = ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif"];
   const videoExts = ["mp4", "webm", "mov", "mkv", "m4v", "avi"];
@@ -51,28 +191,74 @@ export default async function DashboardProfilePage() {
     });
   };
 
-  const posts: FeedPost[] = (postRows || []).map((row: any) => ({
-    id: String(row.id),
-    user: {
-      id: user!.id,
-      name: user!.displayName || "Unknown User",
-      username: profileInfo?.profile?.username || undefined,
-      avatarUrl: user!.avatarUrl || undefined,
-      verified: false,
-    },
-    createdAt: row.created_at ?? Date.now(),
-    text: row.text ?? undefined,
-    attachments: toMediaItems(row.media_urls),
-    tags: row.tags ?? undefined, // if you store tags array
-    meta: {
-      model: row.model_name ?? undefined,
-      category: row.category ?? undefined,
-      subCategory: row.sub_category ?? undefined,
-    },
-    stats: { likes: 0, comments: 0, shares: 0 },
-    liked: false,
-    saved: false,
-  }));
+  const parseTimestamp = (value?: string | null) => {
+    if (!value) return 0;
+    const ms = Date.parse(value);
+    return Number.isNaN(ms) ? 0 : ms;
+  };
+
+  const mapRowToPost = (row: any): FeedPost => {
+    const id = String(row.id);
+    const authorId = row.author ? String(row.author) : user!.id;
+    const profile = profilesMap.get(authorId);
+    const displayName =
+      profile?.full_name ||
+      profile?.username ||
+      (authorId === user!.id ? user!.displayName || "You" : "User");
+
+    return {
+      id,
+      user: {
+        id: authorId,
+        name: displayName,
+        username: profile?.username || undefined,
+        avatarUrl:
+          profile?.avatar_url ||
+          (authorId === user!.id ? user!.avatarUrl || undefined : undefined),
+        bio: profile?.bio || undefined,
+      },
+      createdAt: row.created_at ?? new Date().toISOString(),
+      text: row.text ?? undefined,
+      attachments: toMediaItems(row.media_urls),
+      tags: Array.isArray(row.tags) ? row.tags : undefined,
+      meta: {
+        model: normalizeString(row.model_name),
+        modelLabel: normalizeString(row.model_label),
+        modelKey: normalizeString(row.model_key),
+        modelKind: normalizeString(row.model_kind),
+        modelProvider: normalizeString(row.model_provider),
+        modelProviderSlug: normalizeString(row.model_provider_slug),
+        category: normalizeString(row.category),
+        categorySlug: normalizeString(row.category_slug),
+        subCategory: normalizeString(row.sub_category),
+        subCategorySlug: normalizeString(row.sub_category_slug),
+      },
+      stats: {
+        likes: likeCountMap.get(id) ?? 0,
+        comments: commentCountMap.get(id) ?? 0,
+        shares: 0,
+      },
+      liked: viewerLikedSet.has(id),
+      saved: viewerSavedSet.has(id),
+    } satisfies FeedPost;
+  };
+
+  const posts: FeedPost[] = (postRows || []).map(mapRowToPost);
+  const savedPosts: FeedPost[] = savedPostRows
+    .map(mapRowToPost)
+    .sort(
+      (a, b) =>
+        parseTimestamp(savedOrderMap.get(b.id)) -
+        parseTimestamp(savedOrderMap.get(a.id))
+    );
+
+  const likedPosts: FeedPost[] = likedPostRows
+    .map(mapRowToPost)
+    .sort(
+      (a, b) =>
+        parseTimestamp(likedOrderMap.get(b.id)) -
+        parseTimestamp(likedOrderMap.get(a.id))
+    );
 
   const postCount = posts.length;
 
@@ -203,15 +389,7 @@ export default async function DashboardProfilePage() {
                 <PostFeed
                   posts={posts}
                   className="max-w-2xl mx-auto"
-                  // Optional: wire up async comments when you have an API
-                  // fetchComments={async (post) => {
-                  //   const { data } = await supabase.from("comments").select("*").eq("post_id", post.id).order("created_at", { ascending: false });
-                  //   return (data || []).map(mapToPostComment);
-                  // }}
-                  // onSubmitComment={async (post, text) => {
-                  //   const { data } = await supabase.from("comments").insert({ post_id: post.id, text }).select("*").single();
-                  //   return mapToPostComment(data);
-                  // }}
+                  currentUserId={user!.id}
                 />
               ) : (
                 <div className="mx-auto text-sm flex flex-col items-center justify-center text-muted-foreground pointer-events-none select-none">
@@ -226,10 +404,10 @@ export default async function DashboardProfilePage() {
                       d="M224,128a96,96,0,1,1-96-96A96,96,0,0,1,224,128Z"
                       opacity="0.2"
                     ></path>
-                    <path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216ZM80,108a12,12,0,1,1,12,12A12,12,0,0,1,80,108Zm96,0a12,12,0,1,1-12-12A12,12,0,0,1,176,108Zm-1.08,64a8,8,0,1,1-13.84,8c-7.47-12.91-19.21-20-33.08-20s-25.61,7.1-33.08,20a8,8,0,1,1-13.84-8c10.29-17.79,27.39-28,46.92-28S164.63,154.2,174.92,172Z"></path>
+                    <path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216ZM80,108a12,12,0,1,1,12,12A12,12,0,0,1,80,108Zm96,0a12,12,0,1,1-12-12A12,12,0,0,1,176,108Zm-1.08,64a8,8,0,1,1-13.84,8c-7.47-12.91,19.21-20-33.08-20s-25.61,7.1-33.08,20a8,8,0,1,1-13.84-8c10.29-17.79,27.39-28,46.92-28S164.63,154.2,174.92,172Z"></path>
                   </svg>
                   <span>
-                    <h2>You haven't posted anything yet.</h2>
+                    <h2>Create your first prompt to showcase here.</h2>
                   </span>
                 </div>
               )}
@@ -238,8 +416,7 @@ export default async function DashboardProfilePage() {
             <TabsContent value="about" className="py-6 sm:py-8">
               <AboutMeSection
                 profileInfo={{
-                  bio:
-                    aboutMe?.content ?? profileInfo?.profile?.bio ?? undefined,
+                  bio: aboutMe?.content ?? profileInfo?.profile?.bio ?? undefined,
                   backgroundUrl: profileInfo?.profile?.backgroundUrl ?? null,
                 }}
                 followCounts={{
@@ -252,44 +429,61 @@ export default async function DashboardProfilePage() {
             </TabsContent>
 
             <TabsContent value="saved" className="py-6 sm:py-8">
-              <div className="mx-auto text-sm flex flex-col items-center justify-center text-muted-foreground pointer-events-none select-none">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="150"
-                  height="150"
-                  fill="currentColor"
-                  viewBox="0 0 256 256"
-                >
-                  <path
-                    d="M224,128a96,96,0,1,1-96-96A96,96,0,0,1,224,128Z"
-                    opacity="0.2"
-                  ></path>
-                  <path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216ZM80,108a12,12,0,1,1,12,12A12,12,0,0,1,80,108Zm96,0a12,12,0,1,1-12-12A12,12,0,0,1,176,108Zm-1.08,64a8,8,0,1,1-13.84,8c-7.47-12.91-19.21-20-33.08-20s-25.61,7.1-33.08,20a8,8,0,1,1-13.84-8c10.29-17.79,27.39-28,46.92-28S164.63,154.2,174.92,172Z"></path>
-                </svg>
-                <span>
-                  <h2>Saved prompts will appear here.</h2>
-                </span>
-              </div>
+              {savedPosts.length > 0 ? (
+                <PostFeed
+                  posts={savedPosts}
+                  className="max-w-2xl mx-auto"
+                  currentUserId={user!.id}
+                />
+              ) : (
+                <div className="mx-auto text-sm flex flex-col items-center justify-center text-muted-foreground pointer-events-none select-none">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="150"
+                    height="150"
+                    fill="currentColor"
+                    viewBox="0 0 256 256"
+                  >
+                    <path
+                      d="M224,128a96,96,0,1,1-96-96A96,96,0,0,1,224,128Z"
+                      opacity="0.2"
+                    ></path>
+                    <path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216ZM80,108a12,12,0,1,1,12,12A12,12,0,0,1,80,108Zm96,0a12,12,0,1,1-12-12A12,12,0,0,1,176,108Zm-1.08,64a8,8,0,1,1-13.84,8c-7.47-12.91,19.21-20,33.08-20s-25.61,7.1-33.08,20a8,8,0,1,1-13.84-8c10.29-17.79,27.39-28,46.92-28S164.63,154.2,174.92,172Z"></path>
+                  </svg>
+                  <span>
+                    <h2>Saved prompts will appear here.</h2>
+                  </span>
+                </div>
+              )}
             </TabsContent>
+
             <TabsContent value="liked-post" className="py-6 sm:py-8">
-              <div className="mx-auto text-sm flex flex-col items-center justify-center text-muted-foreground pointer-events-none select-none">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="150"
-                  height="150"
-                  fill="currentColor"
-                  viewBox="0 0 256 256"
-                >
-                  <path
-                    d="M224,128a96,96,0,1,1-96-96A96,96,0,0,1,224,128Z"
-                    opacity="0.2"
-                  ></path>
-                  <path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216ZM80,108a12,12,0,1,1,12,12A12,12,0,0,1,80,108Zm96,0a12,12,0,1,1-12-12A12,12,0,0,1,176,108Zm-1.08,64a8,8,0,1,1-13.84,8c-7.47-12.91-19.21-20-33.08-20s-25.61,7.1-33.08,20a8,8,0,1,1-13.84-8c10.29-17.79,27.39-28,46.92-28S164.63,154.2,174.92,172Z"></path>
-                </svg>
-                <span>
-                  <h2>Liked posts will only be visible to you.</h2>
-                </span>
-              </div>
+              {likedPosts.length > 0 ? (
+                <PostFeed
+                  posts={likedPosts}
+                  className="max-w-2xl mx-auto"
+                  currentUserId={user!.id}
+                />
+              ) : (
+                <div className="mx-auto text-sm flex flex-col items-center justify-center text-muted-foreground pointer-events-none select-none">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="150"
+                    height="150"
+                    fill="currentColor"
+                    viewBox="0 0 256 256"
+                  >
+                    <path
+                      d="M224,128a96,96,0,1,1-96-96A96,96,0,0,1,224,128Z"
+                      opacity="0.2"
+                    ></path>
+                    <path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216ZM80,108a12,12,0,1,1,12,12A12,12,0,0,1,80,108Zm96,0a12,12,0,1,1-12-12A12,12,0,0,1,176,108Zm-1.08,64a8,8,0,1,1-13.84,8c-7.47-12.91,19.21-20,33.08-20s-25.61,7.1-33.08,20a8,8,0,1,1-13.84-8c10.29-17.79,27.39-28,46.92-28S164.63,154.2,174.92,172Z"></path>
+                  </svg>
+                  <span>
+                    <h2>Liked posts will only be visible to you.</h2>
+                  </span>
+                </div>
+              )}
             </TabsContent>
           </Tabs>
         </div>

@@ -26,7 +26,16 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { deletePosts } from "@/util/actions/postsActions";
+import { CommentsList } from "@/components/post/comments-list";
+import {
+  deletePosts,
+  togglePostLike,
+  togglePostSave,
+  createPostComment,
+  getPostComments,
+  getPostEngagement,
+  type PostCommentPayload,
+} from "@/util/actions/postsActions";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,6 +56,7 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
+import { CommentBox } from "@/components/post/comment-box";
 
 /* ============================== Types =============================== */
 
@@ -88,8 +98,15 @@ export type Post = {
   tags?: string[];
   meta?: {
     model?: string;
+    modelLabel?: string;
+    modelKey?: string;
+    modelKind?: string;
+    modelProvider?: string;
+    modelProviderSlug?: string;
     category?: string;
+    categorySlug?: string;
     subCategory?: string;
+    subCategorySlug?: string;
     deleted?: boolean;
     restore?: boolean;
     hidden?: boolean;
@@ -108,13 +125,74 @@ export type Post = {
   comments?: PostComment[];
 };
 
+type PostStats = NonNullable<Post["stats"]>;
+
+type MetaChipData = {
+  key: string;
+  prefix: string;
+  value: string;
+};
+
+function formatMetaValue(raw?: string | null) {
+  if (typeof raw !== "string") return "";
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  if (/[\s]/.test(trimmed)) return trimmed;
+  return trimmed
+    .split(/[-_]/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function deriveMetaChips(meta?: Post["meta"]): MetaChipData[] {
+  if (!meta) return [];
+  const chips: MetaChipData[] = [];
+  const seen = new Set<string>();
+  const add = (key: string, prefix: string, raw?: string | null) => {
+    const value = formatMetaValue(raw);
+    if (!value) return;
+    const dedupeKey = `${prefix}|${value}`;
+    if (seen.has(dedupeKey)) return;
+    seen.add(dedupeKey);
+    chips.push({ key, prefix, value });
+  };
+
+  add("provider", "Provider", meta.modelProvider ?? meta.modelProviderSlug);
+  add("model", "Model", meta.modelLabel ?? meta.model ?? meta.modelKey);
+  add("kind", "Type", meta.modelKind);
+  add("category", "Category", meta.category ?? meta.categorySlug);
+  add(
+    "subCategory",
+    "Subcategory",
+    meta.subCategory ?? meta.subCategorySlug
+  );
+
+  return chips;
+}
+
+function MetaChip({ prefix, value }: { prefix: string; value: string }) {
+  return (
+    <span
+      className="inline-flex max-w-[180px] items-center gap-1 rounded-full border border-border/60 bg-muted/60 px-2.5 py-0.5 text-[11px] text-muted-foreground"
+      title={`${prefix}: ${value}`}
+    >
+      <span className="font-medium text-foreground">{prefix}</span>
+      <span className="truncate">{value}</span>
+    </span>
+  );
+}
+
 export type PostItemProps = {
   post: Post;
   dense?: boolean;
   className?: string;
   currentUserId?: string;
 
-  onLike?: (post: Post, nextLiked: boolean) => void | Promise<void>;
+  onLike?: (
+    post: Post,
+    nextLiked: boolean
+  ) => void | { likes?: number } | Promise<void | { likes?: number }>;
   onComment?: (post: Post) => void;
   onShare?: (post: Post) => void;
   onSave?: (post: Post, nextSaved: boolean) => void | Promise<void>;
@@ -384,7 +462,10 @@ function DesktopPostDetail({
   initialIndex?: number;
   fetchComments?: (post: Post) => Promise<PostComment[]>;
   onSubmitComment?: (post: Post, text: string) => Promise<PostComment | void>;
-  onLike?: (post: Post, nextLiked: boolean) => void | Promise<void>;
+  onLike?: (
+    post: Post,
+    nextLiked: boolean
+  ) => void | { likes?: number } | Promise<void | { likes?: number }>;
   onShare?: (post: Post) => void;
   onSave?: (post: Post, nextSaved: boolean) => void | Promise<void>;
 }) {
@@ -400,6 +481,23 @@ function DesktopPostDetail({
   const [loadingComments, setLoadingComments] = React.useState(false);
   const [reply, setReply] = React.useState("");
   const attachments = post.attachments ?? [];
+  const metaChips = React.useMemo(() => deriveMetaChips(post.meta), [post.meta]);
+
+  const commentItems = React.useMemo(
+    () =>
+      (comments ?? []).map((comment) => ({
+        id: comment.id,
+        text: comment.text,
+        createdAt: comment.createdAt,
+        author: {
+          id: comment.user.id,
+          name: comment.user.name,
+          username: comment.user.username,
+          avatarUrl: comment.user.avatarUrl,
+        },
+      })),
+    [comments]
+  );
 
   React.useEffect(() => setMediaIndex(initialIndex), [initialIndex]);
 
@@ -438,12 +536,23 @@ function DesktopPostDetail({
   const handleLike = async () => {
     const next = !liked;
     setLiked(next);
-    setStats((s) => ({ ...s, likes: s.likes + (next ? 1 : -1) }));
+    setStats((s) => ({ ...s, likes: Math.max(0, s.likes + (next ? 1 : -1)) }));
     try {
-      await onLike?.(post, next);
+      const result = await onLike?.(post, next);
+      if (
+        result &&
+        typeof result === "object" &&
+        "likes" in result &&
+        typeof result.likes === "number"
+      ) {
+        setStats((s) => ({
+          ...s,
+          likes: Math.max(0, result.likes ?? s.likes),
+        }));
+      }
     } catch {
       setLiked(!next);
-      setStats((s) => ({ ...s, likes: s.likes + (next ? -1 : 1) }));
+      setStats((s) => ({ ...s, likes: Math.max(0, s.likes + (next ? -1 : 1)) }));
     }
   };
 
@@ -581,6 +690,17 @@ function DesktopPostDetail({
               {post.text && (
                 <p className="text-[15px] leading-relaxed">{post.text}</p>
               )}
+              {metaChips.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {metaChips.map((chip) => (
+                    <MetaChip
+                      key={chip.key}
+                      prefix={chip.prefix}
+                      value={chip.value}
+                    />
+                  ))}
+                </div>
+              )}
               {post.tags && post.tags.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {post.tags.map((t, i) => (
@@ -626,28 +746,18 @@ function DesktopPostDetail({
 
             <div className="p-6">
               <h4 className="font-semibold mb-4">Comments</h4>
-              {loadingComments ? (
-                <p className="text-sm text-muted-foreground">Loading...</p>
-              ) : comments && comments.length > 0 ? (
-                <div className="space-y-4">
-                  {comments.map((c) => (
-                    <div key={c.id} className="flex gap-3">
-                      <Avatar user={c.user} size={32} />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 text-sm">
-                          <span className="font-medium">{c.user.name}</span>
-                          <span className="text-muted-foreground">
-                            {formatRelativeTime(c.createdAt)}
-                          </span>
-                        </div>
-                        <p className="text-sm mt-1">{c.text}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">No comments yet</p>
-              )}
+              <CommentsList
+                comments={commentItems}
+                loading={loadingComments}
+                loadingLabel={
+                  <p className="text-sm text-muted-foreground">Loading...</p>
+                }
+                emptyLabel={
+                  <p className="text-sm text-muted-foreground">No comments yet</p>
+                }
+                relativeTimeFormatter={formatRelativeTime}
+                avatarSize={32}
+              />
             </div>
           </div>
 
@@ -832,6 +942,7 @@ export const PostItem = React.memo(function PostItem({
   const [detailOpen, setDetailOpen] = React.useState(false);
   const [detailIndex, setDetailIndex] = React.useState(0);
   const [actionsOpen, setActionsOpen] = React.useState(false);
+  const metaChips = React.useMemo(() => deriveMetaChips(post.meta), [post.meta]);
 
   const isAuthor = currentUserId === post.user.id;
   const postUrl = `/home/posts/${post.id}`;
@@ -850,12 +961,23 @@ export const PostItem = React.memo(function PostItem({
   const handleLike = async () => {
     const next = !liked;
     setLiked(next);
-    setStats((s) => ({ ...s, likes: s.likes + (next ? 1 : -1) }));
+    setStats((s) => ({ ...s, likes: Math.max(0, s.likes + (next ? 1 : -1)) }));
     try {
-      await onLike?.(post, next);
+      const result = await onLike?.(post, next);
+      if (
+        result &&
+        typeof result === "object" &&
+        "likes" in result &&
+        typeof result.likes === "number"
+      ) {
+        setStats((s) => ({
+          ...s,
+          likes: Math.max(0, result.likes ?? s.likes),
+        }));
+      }
     } catch {
       setLiked(!next);
-      setStats((s) => ({ ...s, likes: s.likes + (next ? -1 : 1) }));
+      setStats((s) => ({ ...s, likes: Math.max(0, s.likes + (next ? -1 : 1)) }));
     }
   };
 
@@ -1133,6 +1255,18 @@ export const PostItem = React.memo(function PostItem({
               </div>
             )}
 
+            {metaChips.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {metaChips.map((chip) => (
+                  <MetaChip
+                    key={chip.key}
+                    prefix={chip.prefix}
+                    value={chip.value}
+                  />
+                ))}
+              </div>
+            )}
+
             {post.tags && post.tags.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {post.tags.map((tag, i) => (
@@ -1407,15 +1541,15 @@ export function PostFeed({
   dense,
   showDividers = true,
   currentUserId,
-  onLike,
+  onLike: externalOnLike,
   onComment,
   onShare,
-  onSave,
+  onSave: externalOnSave,
   onMore,
   onTagClick,
   onUserClick,
-  fetchComments,
-  onSubmitComment,
+  fetchComments: externalFetchComments,
+  onSubmitComment: externalSubmitComment,
   loading,
   skeletonCount = 3,
 }: PostFeedProps) {
@@ -1451,6 +1585,59 @@ export function PostFeed({
     setItems(posts);
   }, [posts]);
 
+  React.useEffect(() => {
+    let cancelled = false;
+    const loadEngagement = async () => {
+      const ids = posts.map((p) => p.id).filter(Boolean);
+      if (ids.length === 0) return;
+      const res = await getPostEngagement(ids);
+      if (cancelled) return;
+      if (!res.ok) {
+        if (res.error) toast.error(res.error);
+        return;
+      }
+      const map = new Map(res.items?.map((item) => [item.postId, item]));
+      if (map.size === 0) return;
+      setItems((prev) =>
+        prev.map((post) => {
+          const summary = map.get(post.id);
+          if (!summary) return post;
+          const baseStats = post.stats ?? { likes: 0, comments: 0, shares: 0 };
+          return {
+            ...post,
+            stats: {
+              ...baseStats,
+              likes: summary.likes,
+              comments: summary.comments,
+            },
+            liked: summary.liked,
+            saved: summary.saved,
+          };
+        })
+      );
+    };
+
+    loadEngagement();
+    return () => {
+      cancelled = true;
+    };
+  }, [posts, viewerId]);
+
+  const mapPayloadToComment = React.useCallback(
+    (payload: PostCommentPayload): PostComment => ({
+      id: payload.id,
+      text: payload.text,
+      createdAt: payload.createdAt,
+      user: {
+        id: payload.user.id,
+        name: payload.user.name,
+        username: payload.user.username,
+        avatarUrl: payload.user.avatarUrl,
+      },
+    }),
+    []
+  );
+
   const handleMore = React.useCallback(
     (p: Post) => {
       const meta: any = p.meta || {};
@@ -1470,6 +1657,135 @@ export function PostFeed({
     [onMore]
   );
 
+  const handleLikeToggle = React.useCallback(
+    async (post: Post, nextLiked: boolean) => {
+      const res = await togglePostLike(post.id, nextLiked);
+      if (!res.ok) {
+        toast.error(res.error ?? "Couldn't update like");
+        throw new Error(res.error ?? "Failed to update like");
+      }
+
+      setItems((prev) =>
+        prev.map((item) => {
+          if (item.id !== post.id) return item;
+          const prevStats: PostStats = item.stats ?? {
+            likes: 0,
+            comments: 0,
+            shares: 0,
+          };
+          return {
+            ...item,
+            liked: res.liked ?? nextLiked,
+            stats: {
+              ...prevStats,
+              likes: res.likes ?? prevStats.likes,
+            },
+          };
+        })
+      );
+
+      const fallbackLikes = res.likes ?? post.stats?.likes ?? 0;
+
+      const externalResult = await externalOnLike?.(post, nextLiked);
+      if (
+        externalResult &&
+        typeof externalResult === "object" &&
+        "likes" in externalResult &&
+        typeof externalResult.likes === "number"
+      ) {
+        setItems((prev) =>
+          prev.map((item) => {
+            if (item.id !== post.id) return item;
+            const prevStats: PostStats = item.stats ?? {
+              likes: 0,
+              comments: 0,
+              shares: 0,
+            };
+            return {
+              ...item,
+              stats: {
+                ...prevStats,
+                likes: externalResult.likes ?? prevStats.likes,
+              },
+            };
+          })
+        );
+        return { likes: externalResult.likes };
+      }
+
+      return { likes: fallbackLikes };
+    },
+    [externalOnLike, setItems]
+  );
+
+  const handleSaveToggle = React.useCallback(
+    async (post: Post, nextSaved: boolean) => {
+      const res = await togglePostSave(post.id, nextSaved);
+      if (!res.ok) {
+        toast.error(res.error ?? "Couldn't update save");
+        throw new Error(res.error ?? "Failed to update save");
+      }
+
+      setItems((prev) =>
+        prev.map((item) =>
+          item.id === post.id ? { ...item, saved: res.saved ?? nextSaved } : item
+        )
+      );
+
+      await externalOnSave?.(post, nextSaved);
+    },
+    [externalOnSave]
+  );
+
+  const handleFetchComments = React.useCallback(
+    async (post: Post) => {
+      const res = await getPostComments(post.id);
+      if (!res.ok || !res.comments) {
+        if (res.error) toast.error(res.error);
+        const external = await externalFetchComments?.(post);
+        if (external) return external;
+        throw new Error(res.error ?? "Failed to load comments");
+      }
+      const mapped = res.comments.map(mapPayloadToComment);
+      const external = await externalFetchComments?.(post);
+      return external ?? mapped;
+    },
+    [externalFetchComments, mapPayloadToComment]
+  );
+
+  const handleSubmitComment = React.useCallback(
+    async (post: Post, text: string) => {
+      const res = await createPostComment(post.id, text);
+      if (!res.ok || !res.comment) {
+        toast.error(res.error ?? "Couldn't post comment");
+        throw new Error(res.error ?? "Failed to post comment");
+      }
+
+      setItems((prev) =>
+        prev.map((item) => {
+          if (item.id !== post.id) return item;
+          const prevStats: PostStats = item.stats ?? {
+            likes: 0,
+            comments: 0,
+            shares: 0,
+          };
+          return {
+            ...item,
+            stats: {
+              ...prevStats,
+              comments: res.commentsCount ?? prevStats.comments + 1,
+            },
+          };
+        })
+      );
+
+      const mapped = mapPayloadToComment(res.comment);
+      const external = await externalSubmitComment?.(post, text);
+      return external ?? mapped;
+    },
+    [externalSubmitComment, mapPayloadToComment]
+  );
+
   return (
     <div className={cn("w-full", className)}>
       {loading
@@ -1487,15 +1803,15 @@ export function PostFeed({
                 post={post}
                 dense={dense}
                 currentUserId={viewerId}
-                onLike={onLike}
+                onLike={handleLikeToggle}
                 onComment={onComment}
                 onShare={onShare}
-                onSave={onSave}
+                onSave={handleSaveToggle}
                 onMore={handleMore}
                 onTagClick={onTagClick}
                 onUserClick={onUserClick}
-                fetchComments={fetchComments}
-                onSubmitComment={onSubmitComment}
+                fetchComments={handleFetchComments}
+                onSubmitComment={handleSubmitComment}
               />
               {showDividers && i < items.length - 1 && (
                 <div className="border-b" />

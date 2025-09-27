@@ -74,7 +74,7 @@ export default async function DashboardProfilePage({
       supabase
         .from("posts")
         .select(
-          "id, created_at, text, media_urls, model_name, category, sub_category"
+          "id, created_at, text, media_urls, model_name, category, sub_category, author"
         )
         .eq("author", targetId)
         .order("created_at", { ascending: false }),
@@ -96,29 +96,133 @@ export default async function DashboardProfilePage({
     });
   };
 
-  const posts: FeedPost[] =
-    (postsRes.data || []).map((row) => ({
-      id: String(row.id),
+  const authorPostRows = postsRes.data || [];
+
+  const combinedRows = authorPostRows;
+  const engagementIds = Array.from(
+    new Set(combinedRows.map((row) => String(row.id)))
+  );
+
+  const likeCountMap = new Map<string, number>();
+  const commentCountMap = new Map<string, number>();
+  const viewerLikedSet = new Set<string>();
+  let viewerSavedSet = new Set<string>();
+
+  if (engagementIds.length > 0) {
+    const [{ data: likeRows }, { data: commentRows }] = await Promise.all([
+      supabase
+        .from("post_likes")
+        .select("post_id, user_id")
+        .in("post_id", engagementIds),
+      supabase
+        .from("post_comments")
+        .select("post_id")
+        .in("post_id", engagementIds),
+    ]);
+
+    for (const row of likeRows || []) {
+      const key = String(row.post_id);
+      likeCountMap.set(key, (likeCountMap.get(key) || 0) + 1);
+      if (viewerId && row.user_id === viewerId) {
+        viewerLikedSet.add(key);
+      }
+    }
+
+    for (const row of commentRows || []) {
+      const key = String(row.post_id);
+      commentCountMap.set(key, (commentCountMap.get(key) || 0) + 1);
+    }
+
+    if (viewerId) {
+      const { data: viewerSavedRows } = await supabase
+        .from("post_saves")
+        .select("post_id")
+        .eq("user_id", viewerId)
+        .in("post_id", engagementIds);
+      viewerSavedSet = new Set(
+        (viewerSavedRows || []).map((row) => String(row.post_id))
+      );
+    }
+  }
+
+  const authorIdsSet = new Set<string>([targetId]);
+  for (const row of combinedRows) {
+    if (row.author) authorIdsSet.add(String(row.author));
+  }
+
+  const profilesMap = new Map<
+    string,
+    {
+      username: string | null;
+      full_name: string | null;
+      avatar_url: string | null;
+      bio?: string | null;
+    }
+  >();
+
+  const authorIds = Array.from(authorIdsSet);
+  if (authorIds.length > 0) {
+    const { data: authorProfiles } = await supabase
+      .from("profiles")
+      .select("id, username, full_name, avatar_url, bio")
+      .in("id", authorIds);
+    for (const profileRow of authorProfiles || []) {
+      profilesMap.set(String(profileRow.id), {
+        username: profileRow.username ?? null,
+        full_name: profileRow.full_name ?? null,
+        avatar_url: profileRow.avatar_url ?? null,
+        bio: profileRow.bio ?? null,
+      });
+    }
+  }
+
+  profilesMap.set(targetId, {
+    username: targetUsername ?? null,
+    full_name: targetDisplayName ?? null,
+    avatar_url: targetAvatar ?? null,
+    bio: targetBio,
+  });
+
+  const mapRowToPost = (row: any): FeedPost => {
+    const id = String(row.id);
+    const authorId = row.author ? String(row.author) : targetId;
+    const profileInfo = profilesMap.get(authorId);
+    const displayName =
+      profileInfo?.full_name ||
+      profileInfo?.username ||
+      (authorId === targetId
+        ? targetDisplayName || targetUsername || "Unknown User"
+        : "User");
+
+    return {
+      id,
       user: {
-        id: targetId,
-        name: targetDisplayName || targetUsername || "Unknown User",
-        username: targetUsername || undefined,
-        avatarUrl: targetAvatar ?? undefined,
-        verified: false,
+        id: authorId,
+        name: displayName,
+        username: profileInfo?.username || undefined,
+        avatarUrl: profileInfo?.avatar_url || undefined,
+        bio: profileInfo?.bio || undefined,
       },
-      createdAt: row.created_at,
+      createdAt: row.created_at ?? new Date().toISOString(),
       text: row.text ?? undefined,
       attachments: toMediaItems(row.media_urls as string[] | null),
-      tags: (row as any).tags ?? undefined,
+      tags: Array.isArray((row as any).tags) ? (row as any).tags : undefined,
       meta: {
         model: (row as any).model_name ?? undefined,
         category: (row as any).category ?? undefined,
         subCategory: (row as any).sub_category ?? undefined,
       },
-      stats: { likes: 0, comments: 0, shares: 0 },
-      liked: false,
-      saved: false,
-    })) || [];
+      stats: {
+        likes: likeCountMap.get(id) ?? 0,
+        comments: commentCountMap.get(id) ?? 0,
+        shares: 0,
+      },
+      liked: viewerLikedSet.has(id),
+      saved: viewerSavedSet.has(id),
+    } satisfies FeedPost;
+  };
+
+  const posts: FeedPost[] = authorPostRows.map(mapRowToPost);
 
   const initialsFrom = (name?: string | null, handle?: string | null) => {
     const src = (name || handle || "").trim();
@@ -226,12 +330,15 @@ export default async function DashboardProfilePage({
             <TabsList className="w-full justify-start gap-2 overflow-x-auto">
               <TabsTrigger value="prompts">Prompts</TabsTrigger>
               <TabsTrigger value="about">About</TabsTrigger>
-              <TabsTrigger value="saved">Saved Prompts</TabsTrigger>
             </TabsList>
 
             <TabsContent value="prompts" className="py-6 sm:py-8">
               {posts.length > 0 ? (
-                <PostFeed posts={posts} className="max-w-2xl mx-auto" />
+                <PostFeed
+                  posts={posts}
+                  className="max-w-2xl mx-auto"
+                  currentUserId={viewerId ?? undefined}
+                />
               ) : (
                 <div className="py-12 sm:py-16 text-center">
                   <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-muted mx-auto mb-3 sm:mb-4" />
@@ -255,27 +362,6 @@ export default async function DashboardProfilePage({
                 postCount={postsTotal}
                 canEdit={Boolean(isSelf)}
               />
-            </TabsContent>
-
-            <TabsContent value="saved" className="py-6 sm:py-8">
-              <div className="mx-auto text-sm flex flex-col items-center justify-center text-muted-foreground pointer-events-none select-none">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="150"
-                  height="150"
-                  fill="currentColor"
-                  viewBox="0 0 256 256"
-                >
-                  <path
-                    d="M224,128a96,96,0,1,1-96-96A96,96,0,0,1,224,128Z"
-                    opacity="0.2"
-                  ></path>
-                  <path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216ZM80,108a12,12,0,1,1,12,12A12,12,0,0,1,80,108Zm96,0a12,12,0,1,1-12-12A12,12,0,0,1,176,108Zm-1.08,64a8,8,0,1,1-13.84,8c-7.47-12.91-19.21-20-33.08-20s-25.61,7.1-33.08,20a8,8,0,1,1-13.84-8c10.29-17.79,27.39-28,46.92-28S164.63,154.2,174.92,172Z"></path>
-                </svg>
-                <span>
-                  <h2>Saved prompts will appear here.</h2>
-                </span>
-              </div>
             </TabsContent>
           </Tabs>
         </div>

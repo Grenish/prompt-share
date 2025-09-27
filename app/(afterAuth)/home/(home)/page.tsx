@@ -5,6 +5,12 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { PostFeed, type Post as FeedPost } from "@/components/post-feed";
 import { UserButton } from "@/components/userButton";
 
+const normalizeString = (value: unknown): string | undefined => {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
 export default async function DashboardHomePage() {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getUser();
@@ -32,7 +38,7 @@ export default async function DashboardHomePage() {
   const { data: postRows, error: postsError } = await supabase
     .from("posts")
     .select(
-      "id, created_at, text, category, sub_category, model_name, media_urls, author"
+      "id, created_at, text, category, category_slug, sub_category, sub_category_slug, model_name, model_label, model_key, model_kind, model_provider, model_provider_slug, media_urls, author"
     )
     .order("created_at", { ascending: false })
     .limit(30);
@@ -107,9 +113,16 @@ export default async function DashboardHomePage() {
       }),
       tags: [],
       meta: {
-        model: row.model_name || undefined,
-        category: row.category || undefined,
-        subCategory: row.sub_category || undefined,
+        model: normalizeString(row.model_name),
+        modelLabel: normalizeString(row.model_label),
+        modelKey: normalizeString(row.model_key),
+        modelKind: normalizeString(row.model_kind),
+        modelProvider: normalizeString(row.model_provider),
+        modelProviderSlug: normalizeString(row.model_provider_slug),
+        category: normalizeString(row.category),
+        categorySlug: normalizeString(row.category_slug),
+        subCategory: normalizeString(row.sub_category),
+        subCategorySlug: normalizeString(row.sub_category_slug),
       },
       stats: { likes: 0, comments: 0, shares: 0 },
       liked: false,
@@ -131,6 +144,62 @@ export default async function DashboardHomePage() {
     finalFeed.map((p) => p.user.id).filter(Boolean)
   );
   const authorIdList = Array.from(authorIdSet);
+
+  const postIdList = finalFeed.map((p) => p.id).filter(Boolean);
+
+  let viewerLikedSet = new Set<string>();
+  let viewerSavedSet = new Set<string>();
+
+  if (postIdList.length > 0) {
+    const [{ data: likeRows }, { data: commentRows }] = await Promise.all([
+      supabase
+        .from("post_likes")
+        .select("post_id, user_id")
+        .in("post_id", postIdList),
+      supabase
+        .from("post_comments")
+        .select("post_id")
+        .in("post_id", postIdList),
+    ]);
+
+    const likeCountMap = new Map<string, number>();
+    for (const row of likeRows || []) {
+      const key = String(row.post_id);
+      likeCountMap.set(key, (likeCountMap.get(key) || 0) + 1);
+      if (viewerId && row.user_id === viewerId) {
+        viewerLikedSet.add(key);
+      }
+    }
+
+    const commentCountMap = new Map<string, number>();
+    for (const row of commentRows || []) {
+      const key = String(row.post_id);
+      commentCountMap.set(key, (commentCountMap.get(key) || 0) + 1);
+    }
+
+    if (viewerId) {
+      const { data: savedRows } = await supabase
+        .from("post_saves")
+        .select("post_id")
+        .eq("user_id", viewerId)
+        .in("post_id", postIdList);
+      for (const row of savedRows || []) {
+        viewerSavedSet.add(String(row.post_id));
+      }
+    }
+
+    for (const post of finalFeed) {
+      const likes = likeCountMap.get(post.id) ?? 0;
+      const comments = commentCountMap.get(post.id) ?? 0;
+      post.stats = {
+        likes,
+        comments,
+        shares: post.stats?.shares ?? 0,
+      };
+      post.liked = viewerLikedSet.has(post.id);
+      post.saved = viewerSavedSet.has(post.id);
+    }
+  }
 
   if (authorIdList.length > 0) {
     const { data: postsAuthorRows } = await supabase

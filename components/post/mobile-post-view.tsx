@@ -3,6 +3,16 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import BackButton from "@/components/back-button";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { CommentsList } from "@/components/post/comments-list";
+import {
+  togglePostLike,
+  togglePostSave,
+  createPostComment,
+  type PostCommentPayload,
+} from "@/util/actions/postsActions";
+import { toast } from "sonner";
 import {
   Bookmark,
   Heart,
@@ -16,20 +26,44 @@ import {
   ArrowLeft,
 } from "lucide-react";
 
+export type MobilePostComment = {
+  id: string;
+  text: string;
+  createdAt: string | number | Date;
+  author: {
+    id: string;
+    name: string;
+    username?: string;
+    avatarUrl?: string;
+  };
+};
+
 export type MobilePost = {
   id: string;
   createdAt: string | number | Date | null;
   text: string;
   media: string[];
   modelName?: string;
+  modelLabel?: string;
+  modelKey?: string;
+  modelKind?: string;
+  modelProvider?: string;
+  modelProviderSlug?: string;
   category?: string;
   subCategory?: string;
+  categorySlug?: string;
+  subCategorySlug?: string;
   author?: {
     id: string;
     name: string;
     username?: string;
     avatarUrl?: string;
   };
+  liked?: boolean;
+  saved?: boolean;
+  likesCount?: number;
+  commentCount?: number;
+  comments?: MobilePostComment[];
 };
 
 function formatRelativeTime(
@@ -69,6 +103,63 @@ function formatFullTimestamp(
     return d.toISOString();
   }
 }
+
+type MobileMetaChip = {
+  key: string;
+  prefix: string;
+  value: string;
+};
+
+function formatMetaValue(raw?: string | null) {
+  if (typeof raw !== "string") return "";
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  if (/[\s]/.test(trimmed)) return trimmed;
+  return trimmed
+    .split(/[-_]/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function derivePostMetaChips(post: MobilePost): MobileMetaChip[] {
+  const chips: MobileMetaChip[] = [];
+  const seen = new Set<string>();
+  const add = (key: string, prefix: string, raw?: string | null) => {
+    const value = formatMetaValue(raw);
+    if (!value) return;
+    const dedupeKey = `${prefix}|${value}`;
+    if (seen.has(dedupeKey)) return;
+    seen.add(dedupeKey);
+    chips.push({ key, prefix, value });
+  };
+
+  add("provider", "Provider", post.modelProvider ?? post.modelProviderSlug);
+  add(
+    "model",
+    "Model",
+    post.modelLabel ?? post.modelName ?? post.modelKey
+  );
+  add("kind", "Type", post.modelKind);
+  add("category", "Category", post.category ?? post.categorySlug);
+  add(
+    "subCategory",
+    "Subcategory",
+    post.subCategory ?? post.subCategorySlug
+  );
+
+  return chips;
+}
+
+const MetaChip = ({ prefix, value }: { prefix: string; value: string }) => (
+  <span
+    className="inline-flex max-w-[200px] items-center gap-1 rounded-full border border-border/60 bg-muted/60 px-2.5 py-0.5 text-[11px] text-muted-foreground"
+    title={`${prefix}: ${value}`}
+  >
+    <span className="font-medium text-foreground">{prefix}</span>
+    <span className="truncate">{value}</span>
+  </span>
+);
 
 function isVideoUrl(url: string) {
   const lower = url.toLowerCase();
@@ -391,18 +482,30 @@ function useShareCurrentUrl() {
   }, []);
 }
 
-function ActionsRow({ onShare }: { onShare: () => void }) {
-  const [liked, setLiked] = React.useState(false);
-  const [saved, setSaved] = React.useState(false);
+function ActionsRow({
+  liked,
+  saved,
+  onLike,
+  onSave,
+  onShare,
+  onComment,
+}: {
+  liked: boolean;
+  saved: boolean;
+  onLike: () => void | Promise<void>;
+  onSave: () => void | Promise<void>;
+  onShare: () => void;
+  onComment: () => void;
+}) {
   return (
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-1.5">
-        <IconButton aria-label="Reply">
+        <IconButton aria-label="Reply" onClick={onComment}>
           <MessageCircle className="h-5 w-5" />
         </IconButton>
         <IconButton
           aria-label={liked ? "Unlike" : "Like"}
-          onClick={() => setLiked((v) => !v)}
+          onClick={onLike}
           className={liked ? "text-rose-500" : undefined}
         >
           <Heart className={cn("h-5 w-5", liked && "fill-current")} />
@@ -413,7 +516,7 @@ function ActionsRow({ onShare }: { onShare: () => void }) {
       </div>
       <IconButton
         aria-label={saved ? "Remove bookmark" : "Bookmark"}
-        onClick={() => setSaved((v) => !v)}
+        onClick={onSave}
         className={saved ? "text-primary" : undefined}
       >
         <Bookmark className={cn("h-5 w-5", saved && "fill-current")} />
@@ -466,11 +569,104 @@ export function MobilePostView({ post }: { post: MobilePost }) {
   const onShare = useShareCurrentUrl();
   const [lightboxOpen, setLightboxOpen] = React.useState(false);
   const [lightboxIndex, setLightboxIndex] = React.useState(0);
+  const [liked, setLiked] = React.useState(Boolean(post.liked));
+  const [saved, setSaved] = React.useState(Boolean(post.saved));
+  const [likesCount, setLikesCount] = React.useState(post.likesCount ?? 0);
+  const [commentCount, setCommentCount] = React.useState(
+    post.commentCount ?? post.comments?.length ?? 0
+  );
+  const [comments, setComments] = React.useState<MobilePostComment[]>(
+    post.comments ?? []
+  );
+  const [commentInput, setCommentInput] = React.useState("");
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const commentInputRef = React.useRef<HTMLTextAreaElement | null>(null);
+  const metaChips = React.useMemo(() => derivePostMetaChips(post), [post]);
+
+  React.useEffect(() => {
+    setLiked(Boolean(post.liked));
+    setSaved(Boolean(post.saved));
+    setLikesCount(post.likesCount ?? 0);
+    setCommentCount(post.commentCount ?? post.comments?.length ?? 0);
+    setComments(post.comments ?? []);
+  }, [post]);
 
   const openViewer = (i: number) => {
     setLightboxIndex(i);
     setLightboxOpen(true);
   };
+
+  const focusCommentInput = React.useCallback(() => {
+    commentInputRef.current?.focus();
+  }, []);
+
+  const toMobileComment = React.useCallback(
+    (payload: PostCommentPayload): MobilePostComment => ({
+      id: payload.id,
+      text: payload.text,
+      createdAt: payload.createdAt,
+      author: {
+        id: payload.user.id,
+        name: payload.user.name,
+        username: payload.user.username,
+        avatarUrl: payload.user.avatarUrl,
+      },
+    }),
+    []
+  );
+
+  const handleToggleLike = React.useCallback(async () => {
+    const next = !liked;
+    setLiked(next);
+    setLikesCount((prev) => Math.max(0, prev + (next ? 1 : -1)));
+    try {
+      const res = await togglePostLike(post.id, next);
+      if (!res.ok) throw new Error(res.error ?? "Couldn't update like");
+      if (typeof res.likes === "number") {
+        setLikesCount(res.likes);
+      }
+    } catch (error) {
+      setLiked(!next);
+      setLikesCount((prev) => Math.max(0, prev + (next ? -1 : 1)));
+      toast.error((error as Error).message || "Couldn't update like");
+    }
+  }, [liked, post.id]);
+
+  const handleToggleSave = React.useCallback(async () => {
+    const next = !saved;
+    setSaved(next);
+    try {
+      const res = await togglePostSave(post.id, next);
+      if (!res.ok) throw new Error(res.error ?? "Couldn't update save");
+      if (typeof res.saved === "boolean") setSaved(res.saved);
+    } catch (error) {
+      setSaved(!next);
+      toast.error((error as Error).message || "Couldn't update save");
+    }
+  }, [saved, post.id]);
+
+  const handleSubmitComment = React.useCallback(async () => {
+    const body = commentInput.trim();
+    if (!body) return;
+    setIsSubmitting(true);
+    setCommentInput("");
+    try {
+      const res = await createPostComment(post.id, body);
+      if (!res.ok || !res.comment) {
+        throw new Error(res.error ?? "Couldn't post comment");
+      }
+      const mapped = toMobileComment(res.comment);
+      setComments((prev) => [mapped, ...prev]);
+      setCommentCount((prev) =>
+        res.commentsCount != null ? res.commentsCount : prev + 1
+      );
+    } catch (error) {
+      toast.error((error as Error).message || "Couldn't post comment");
+      setCommentInput(body);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [commentInput, post.id, toMobileComment]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -490,23 +686,15 @@ export function MobilePostView({ post }: { post: MobilePost }) {
           <MediaInline media={post.media} onOpenViewer={openViewer} />
         )}
 
-        {(post.category || post.subCategory || post.modelName) && (
+        {metaChips.length > 0 && (
           <div className="flex flex-wrap gap-1.5 pt-1">
-            {post.modelName && (
-              <span className="rounded-full border bg-muted/60 px-2 py-0.5 text-xs">
-                {post.modelName}
-              </span>
-            )}
-            {post.category && (
-              <span className="rounded-full border bg-muted/60 px-2 py-0.5 text-xs">
-                {post.category}
-              </span>
-            )}
-            {post.subCategory && (
-              <span className="rounded-full border bg-muted/60 px-2 py-0.5 text-xs">
-                {post.subCategory}
-              </span>
-            )}
+            {metaChips.map((chip) => (
+              <MetaChip
+                key={chip.key}
+                prefix={chip.prefix}
+                value={chip.value}
+              />
+            ))}
           </div>
         )}
 
@@ -518,7 +706,50 @@ export function MobilePostView({ post }: { post: MobilePost }) {
 
         <div className="border-b" />
 
-        <ActionsRow onShare={onShare} />
+        <ActionsRow
+          liked={liked}
+          saved={saved}
+          onLike={handleToggleLike}
+          onSave={handleToggleSave}
+          onShare={onShare}
+          onComment={focusCommentInput}
+        />
+
+        <div className="text-xs text-muted-foreground flex items-center gap-3">
+          <span>
+            {likesCount} {likesCount === 1 ? "like" : "likes"}
+          </span>
+          <span>
+            {commentCount} {commentCount === 1 ? "comment" : "comments"}
+          </span>
+        </div>
+
+        <div className="space-y-4 rounded-2xl border bg-muted/30 p-4">
+          <h3 className="text-sm font-semibold">Comments</h3>
+          <div className="flex items-start gap-3">
+            <Textarea
+              ref={commentInputRef}
+              value={commentInput}
+              onChange={(e) => setCommentInput(e.target.value)}
+              placeholder="Add a comment..."
+              className="min-h-[56px] flex-1 resize-none"
+            />
+            <Button
+              type="button"
+              onClick={handleSubmitComment}
+              disabled={isSubmitting || !commentInput.trim()}
+              size="sm"
+            >
+              Post
+            </Button>
+          </div>
+
+          <CommentsList
+            comments={comments}
+            relativeTimeFormatter={formatRelativeTime}
+            avatarSize={32}
+          />
+        </div>
       </div>
 
       {/* Lightbox viewer (Twitter-like full screen) */}

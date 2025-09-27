@@ -136,8 +136,15 @@ export type ModelPost = {
   text: string | null;
   media_urls: string[];
   model_name: string | null;
+  model_label: string | null;
+  model_key: string | null;
+  model_kind: string | null;
+  model_provider: string | null;
+  model_provider_slug: string | null;
   category: string | null;
+  category_slug: string | null;
   sub_category: string | null;
+  sub_category_slug: string | null;
   author: string | null;
   author_profile: {
     id: string;
@@ -146,6 +153,105 @@ export type ModelPost = {
     avatar_url: string | null;
   } | null;
 };
+
+export type OtherModelSummary = {
+  label?: string;
+  name?: string;
+  key?: string;
+  kind?: string;
+  provider?: string;
+  providerSlug?: string;
+  category?: string;
+  categorySlug?: string;
+  subCategory?: string;
+  subCategorySlug?: string;
+};
+
+export async function fetchDistinctOtherModels(options?: {
+  limit?: number;
+  search?: string;
+}): Promise<{ ok: boolean; models?: OtherModelSummary[]; error?: string }> {
+  const limit = options?.limit ?? 120;
+  const search = normalizeString(options?.search);
+
+  try {
+    const supabase = await createClient();
+    let query = supabase
+      .from("posts")
+      .select(
+        "model_name, model_label, model_key, model_kind, model_provider, model_provider_slug, category, category_slug, sub_category, sub_category_slug"
+      )
+      .not("model_name", "is", null)
+      .not("model_name", "eq", "")
+      .not("model_name", "ilike", "chatgpt%")
+      .not("model_name", "ilike", "gemini%")
+      .not("model_name", "ilike", "grok%")
+      .not("model_name", "ilike", "midjourney%");
+
+    if (search) {
+      const like = `%${search}%`;
+      query = query.or(
+        [
+          `model_name.ilike.${like}`,
+          `model_label.ilike.${like}`,
+          `model_provider.ilike.${like}`,
+          `model_kind.ilike.${like}`,
+          `category.ilike.${like}`,
+          `sub_category.ilike.${like}`,
+        ].join(",")
+      );
+    }
+
+    const { data, error } = await query.limit(500);
+    if (error) return { ok: false, error: error.message };
+
+    const seen = new Map<string, OtherModelSummary>();
+    for (const row of data || []) {
+      const modelName = normalizeString((row as any).model_name);
+      const label = normalizeString((row as any).model_label);
+      const key = normalizeString((row as any).model_key);
+      const provider = normalizeString((row as any).model_provider);
+      const providerSlug = normalizeString((row as any).model_provider_slug);
+      const kind = normalizeString((row as any).model_kind);
+      const category = normalizeString((row as any).category);
+      const categorySlug = normalizeString((row as any).category_slug);
+      const subCategory = normalizeString((row as any).sub_category);
+      const subCategorySlug = normalizeString((row as any).sub_category_slug);
+
+      const canonical = [
+        (key || label || modelName || "").toLowerCase(),
+        (providerSlug || provider || "").toLowerCase(),
+      ].join("::");
+      if (!canonical.trim()) continue;
+      if (seen.has(canonical)) continue;
+
+      seen.set(canonical, {
+        label,
+        name: modelName,
+        key,
+        kind,
+        provider,
+        providerSlug,
+        category,
+        categorySlug,
+        subCategory,
+        subCategorySlug,
+      });
+    }
+
+    const models = Array.from(seen.values())
+      .sort((a, b) => {
+        const left = a.label || a.name || "";
+        const right = b.label || b.name || "";
+        return left.localeCompare(right);
+      })
+      .slice(0, limit);
+
+    return { ok: true, models };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || "Failed to load models" };
+  }
+}
 
 export async function fetchPostsByModelCategory(params: {
   model: ModelCategory;
@@ -160,7 +266,9 @@ export async function fetchPostsByModelCategory(params: {
 
     let q = supabase
       .from("posts")
-      .select("id, created_at, text, media_urls, model_name, category, sub_category, author")
+      .select(
+        "id, created_at, text, media_urls, model_name, model_label, model_key, model_kind, model_provider, model_provider_slug, category, category_slug, sub_category, sub_category_slug, author"
+      )
       .order("created_at", { ascending: false })
       .limit(limit);
 
@@ -193,9 +301,18 @@ export async function fetchPostsByModelCategory(params: {
       created_at: (r as any).created_at ?? null,
       text: (r as any).text ?? null,
       media_urls: (Array.isArray((r as any).media_urls) ? (r as any).media_urls : []) as string[],
-      model_name: (r as any).model_name ?? null,
-      category: (r as any).category ?? null,
-      sub_category: (r as any).sub_category ?? null,
+      model_name: normalizeString((r as any).model_name) ?? null,
+      model_label: normalizeString((r as any).model_label) ?? null,
+      model_key: normalizeString((r as any).model_key) ?? null,
+      model_kind: normalizeString((r as any).model_kind) ?? null,
+      model_provider: normalizeString((r as any).model_provider) ?? null,
+      model_provider_slug:
+        normalizeString((r as any).model_provider_slug) ?? null,
+      category: normalizeString((r as any).category) ?? null,
+      category_slug: normalizeString((r as any).category_slug) ?? null,
+      sub_category: normalizeString((r as any).sub_category) ?? null,
+      sub_category_slug:
+        normalizeString((r as any).sub_category_slug) ?? null,
       author: (r as any).author ?? null,
       author_profile: null,
     })) as ModelPost[];
@@ -348,4 +465,10 @@ export async function searchDistinctOtherModels(options: {
   } catch (e: any) {
     return { ok: false, error: e?.message || "Failed to search models" };
   }
+}
+
+function normalizeString(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
 }
