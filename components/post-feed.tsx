@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { CommentsList } from "@/components/post/comments-list";
 import {
   deletePosts,
   togglePostLike,
@@ -55,6 +56,7 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
+import { CommentBox } from "@/components/post/comment-box";
 
 /* ============================== Types =============================== */
 
@@ -96,8 +98,15 @@ export type Post = {
   tags?: string[];
   meta?: {
     model?: string;
+    modelLabel?: string;
+    modelKey?: string;
+    modelKind?: string;
+    modelProvider?: string;
+    modelProviderSlug?: string;
     category?: string;
+    categorySlug?: string;
     subCategory?: string;
+    subCategorySlug?: string;
     deleted?: boolean;
     restore?: boolean;
     hidden?: boolean;
@@ -117,6 +126,62 @@ export type Post = {
 };
 
 type PostStats = NonNullable<Post["stats"]>;
+
+type MetaChipData = {
+  key: string;
+  prefix: string;
+  value: string;
+};
+
+function formatMetaValue(raw?: string | null) {
+  if (typeof raw !== "string") return "";
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  if (/[\s]/.test(trimmed)) return trimmed;
+  return trimmed
+    .split(/[-_]/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function deriveMetaChips(meta?: Post["meta"]): MetaChipData[] {
+  if (!meta) return [];
+  const chips: MetaChipData[] = [];
+  const seen = new Set<string>();
+  const add = (key: string, prefix: string, raw?: string | null) => {
+    const value = formatMetaValue(raw);
+    if (!value) return;
+    const dedupeKey = `${prefix}|${value}`;
+    if (seen.has(dedupeKey)) return;
+    seen.add(dedupeKey);
+    chips.push({ key, prefix, value });
+  };
+
+  add("provider", "Provider", meta.modelProvider ?? meta.modelProviderSlug);
+  add("model", "Model", meta.modelLabel ?? meta.model ?? meta.modelKey);
+  add("kind", "Type", meta.modelKind);
+  add("category", "Category", meta.category ?? meta.categorySlug);
+  add(
+    "subCategory",
+    "Subcategory",
+    meta.subCategory ?? meta.subCategorySlug
+  );
+
+  return chips;
+}
+
+function MetaChip({ prefix, value }: { prefix: string; value: string }) {
+  return (
+    <span
+      className="inline-flex max-w-[180px] items-center gap-1 rounded-full border border-border/60 bg-muted/60 px-2.5 py-0.5 text-[11px] text-muted-foreground"
+      title={`${prefix}: ${value}`}
+    >
+      <span className="font-medium text-foreground">{prefix}</span>
+      <span className="truncate">{value}</span>
+    </span>
+  );
+}
 
 export type PostItemProps = {
   post: Post;
@@ -416,6 +481,23 @@ function DesktopPostDetail({
   const [loadingComments, setLoadingComments] = React.useState(false);
   const [reply, setReply] = React.useState("");
   const attachments = post.attachments ?? [];
+  const metaChips = React.useMemo(() => deriveMetaChips(post.meta), [post.meta]);
+
+  const commentItems = React.useMemo(
+    () =>
+      (comments ?? []).map((comment) => ({
+        id: comment.id,
+        text: comment.text,
+        createdAt: comment.createdAt,
+        author: {
+          id: comment.user.id,
+          name: comment.user.name,
+          username: comment.user.username,
+          avatarUrl: comment.user.avatarUrl,
+        },
+      })),
+    [comments]
+  );
 
   React.useEffect(() => setMediaIndex(initialIndex), [initialIndex]);
 
@@ -608,6 +690,17 @@ function DesktopPostDetail({
               {post.text && (
                 <p className="text-[15px] leading-relaxed">{post.text}</p>
               )}
+              {metaChips.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {metaChips.map((chip) => (
+                    <MetaChip
+                      key={chip.key}
+                      prefix={chip.prefix}
+                      value={chip.value}
+                    />
+                  ))}
+                </div>
+              )}
               {post.tags && post.tags.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {post.tags.map((t, i) => (
@@ -653,28 +746,18 @@ function DesktopPostDetail({
 
             <div className="p-6">
               <h4 className="font-semibold mb-4">Comments</h4>
-              {loadingComments ? (
-                <p className="text-sm text-muted-foreground">Loading...</p>
-              ) : comments && comments.length > 0 ? (
-                <div className="space-y-4">
-                  {comments.map((c) => (
-                    <div key={c.id} className="flex gap-3">
-                      <Avatar user={c.user} size={32} />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 text-sm">
-                          <span className="font-medium">{c.user.name}</span>
-                          <span className="text-muted-foreground">
-                            {formatRelativeTime(c.createdAt)}
-                          </span>
-                        </div>
-                        <p className="text-sm mt-1">{c.text}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">No comments yet</p>
-              )}
+              <CommentsList
+                comments={commentItems}
+                loading={loadingComments}
+                loadingLabel={
+                  <p className="text-sm text-muted-foreground">Loading...</p>
+                }
+                emptyLabel={
+                  <p className="text-sm text-muted-foreground">No comments yet</p>
+                }
+                relativeTimeFormatter={formatRelativeTime}
+                avatarSize={32}
+              />
             </div>
           </div>
 
@@ -859,6 +942,7 @@ export const PostItem = React.memo(function PostItem({
   const [detailOpen, setDetailOpen] = React.useState(false);
   const [detailIndex, setDetailIndex] = React.useState(0);
   const [actionsOpen, setActionsOpen] = React.useState(false);
+  const metaChips = React.useMemo(() => deriveMetaChips(post.meta), [post.meta]);
 
   const isAuthor = currentUserId === post.user.id;
   const postUrl = `/home/posts/${post.id}`;
@@ -1168,6 +1252,18 @@ export const PostItem = React.memo(function PostItem({
                   onOpen={openMediaViewer}
                   isMobile={isMobile}
                 />
+              </div>
+            )}
+
+            {metaChips.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {metaChips.map((chip) => (
+                  <MetaChip
+                    key={chip.key}
+                    prefix={chip.prefix}
+                    value={chip.value}
+                  />
+                ))}
               </div>
             )}
 
