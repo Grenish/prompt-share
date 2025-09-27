@@ -1559,16 +1559,19 @@ export function PostItem({
                   <span>{numberCompact(stats.likes)}</span>
                 </button>
                 <button
+                <button
                   onClick={(e) => {
                     e.stopPropagation();
                     if (isMobile) {
-                      // navigate to detail page on mobile to comment
-                      const router = useRouter(); // cannot use hook here; move this outside if needed
+                      router.push(postUrl);
                     } else {
                       onComment?.(post);
                       setDetailOpen(true);
                     }
                   }}
+                   className="flex items-center gap-1.5"
+                   data-stop-nav
+                 >
                   className="flex items-center gap-1.5"
                   data-stop-nav
                 >
