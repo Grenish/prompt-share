@@ -11,7 +11,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Image as ImageIcon, X, Check, ChevronsUpDown } from "lucide-react";
+import {
+  Image as ImageIcon,
+  X,
+  Check,
+  ChevronsUpDown,
+  Loader2,
+} from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -32,7 +38,6 @@ import { optimizeMedia, type OptimizeOptions } from "@/lib/media-optimizer";
 type MediaItem = { file: File; url: string };
 type VideoOptions = NonNullable<OptimizeOptions["video"]>;
 
-/* Providers */
 const PROVIDERS = [
   { id: "openai", label: "OpenAI" },
   { id: "anthropic", label: "Anthropic" },
@@ -279,10 +284,19 @@ const SUB_CATEGORIES: Record<(typeof CATEGORY_OPTIONS)[number], string[]> = {
   Others: [],
 };
 
+function graphemeLength(input: string): number {
+  if (typeof Intl !== "undefined" && Intl.Segmenter) {
+    const seg = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+    let count = 0;
+    for (const _ of seg.segment(input)) count++;
+    return count;
+  }
+  return Array.from(input).length;
+}
+
 export default function DashboardCreatePage() {
   const MAX_FILES = 4;
   const IMAGE_MAX_MB = 5;
-  const VIDEO_TARGET_MB = 1;
   const IMAGE_MAX_BYTES = IMAGE_MAX_MB * 1024 * 1024;
   const MAX_CHARS = 2000;
 
@@ -298,6 +312,11 @@ export default function DashboardCreatePage() {
     currentPercent: 0,
     fileName: null as string | null,
   });
+
+  const [isPosting, setIsPosting] = React.useState(false);
+  const [postProgress, setPostProgress] = React.useState(0);
+  const postIntervalRef = React.useRef<number | null>(null);
+  const postAbortRef = React.useRef<AbortController | null>(null);
 
   const [tags, setTags] = React.useState<string[]>([]);
   const [tagInput, setTagInput] = React.useState("");
@@ -315,7 +334,8 @@ export default function DashboardCreatePage() {
 
   const [showErrors, setShowErrors] = React.useState(false);
 
-  const remaining = MAX_CHARS - text.length;
+  const charCount = React.useMemo(() => graphemeLength(text), [text]);
+  const remaining = MAX_CHARS - charCount;
 
   // Tag helpers
   const toSlug = (raw: string) =>
@@ -330,8 +350,9 @@ export default function DashboardCreatePage() {
   const slugifyTag = (raw: string) => toSlug(raw);
 
   const addTag = (raw: string) => {
-    if (!raw) return;
-    const t = slugifyTag(raw);
+    const trimmed = raw.trim();
+    if (!trimmed) return;
+    const t = slugifyTag(trimmed).slice(0, 40); // small guardrail
     if (!t) return;
     if (tags.includes(t)) {
       toast.message(`Tag "${t}" already added`);
@@ -347,7 +368,7 @@ export default function DashboardCreatePage() {
   const addManyTags = (raw: string) => {
     const parts = raw
       .split(/[,\n]+/)
-      .map(slugifyTag)
+      .map((p) => slugifyTag(p).slice(0, 40))
       .filter(Boolean);
     if (!parts.length) return;
     const toAdd: string[] = [];
@@ -369,7 +390,7 @@ export default function DashboardCreatePage() {
       tagInput.trim()
     ) {
       e.preventDefault();
-  addTag(tagInput);
+      addTag(tagInput);
       setTagInput("");
     } else if (e.key === "Backspace" && !tagInput && tags.length) {
       setTags((prev) => prev.slice(0, -1));
@@ -523,6 +544,10 @@ export default function DashboardCreatePage() {
   React.useEffect(() => {
     return () => {
       media.forEach((m) => URL.revokeObjectURL(m.url));
+      // abort an in-flight post on unmount
+      postAbortRef.current?.abort();
+      if (postIntervalRef.current)
+        window.clearInterval(postIntervalRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -549,7 +574,8 @@ export default function DashboardCreatePage() {
 
   const requiredOk =
     promptValid && modelValid && categoryValid && subCategoryValid && tagsValid;
-  const canPost = requiredOk && !isOptimizing;
+  const busy = isOptimizing || isPosting;
+  const canPost = requiredOk && !busy;
 
   const providerLabel =
     provider === "others"
@@ -563,15 +589,40 @@ export default function DashboardCreatePage() {
       : MODELS_BY_PROVIDER[provider]?.find((m) => m.key === modelKey)?.label ||
         "";
 
+  // Indeterminate progress driver for "Posting…"
+  const startPostProgress = React.useCallback(() => {
+    setPostProgress(10);
+    if (postIntervalRef.current) window.clearInterval(postIntervalRef.current);
+    postIntervalRef.current = window.setInterval(() => {
+      setPostProgress((p) => (p < 90 ? p + 2 : 90));
+    }, 120);
+  }, []);
+
+  const stopPostProgress = React.useCallback((to = 100) => {
+    if (postIntervalRef.current) {
+      window.clearInterval(postIntervalRef.current);
+      postIntervalRef.current = null;
+    }
+    setPostProgress(to);
+    // allow the bar to reach 100% before hiding
+    window.setTimeout(() => setPostProgress(0), 300);
+  }, []);
+
   const handlePost = async () => {
-    if (!requiredOk) {
+    if (!requiredOk || busy) {
       setShowErrors(true);
-      toast.error("Please fill all required fields.");
+      if (!busy) toast.error("Please fill all required fields.");
       return;
     }
-    if (isOptimizing) return;
 
     setError(null);
+    setIsPosting(true);
+    startPostProgress();
+
+    const controller = new AbortController();
+    postAbortRef.current = controller;
+    const timeout = window.setTimeout(() => controller.abort(), 45_000);
+
     try {
       const providerSlug =
         provider === "others" ? toSlug(customProvider) : provider;
@@ -609,33 +660,59 @@ export default function DashboardCreatePage() {
       form.append("category", resolvedCategory);
       form.append("subCategory", resolvedSubCategory);
       if (categorySlug) form.append("categorySlug", categorySlug);
-      if (subCategorySlug)
-        form.append("subCategorySlug", subCategorySlug);
+      if (subCategorySlug) form.append("subCategorySlug", subCategorySlug);
       form.append("modelProviderLabel", providerLabel);
       if (providerSlug) form.append("modelProviderSlug", providerSlug);
       if (resolvedModelKey) form.append("modelKey", resolvedModelKey);
-      if (resolvedModelLabel)
-        form.append("modelLabel", resolvedModelLabel);
-      if (resolvedModelKind)
-        form.append("modelKind", resolvedModelKind);
+      if (resolvedModelLabel) form.append("modelLabel", resolvedModelLabel);
+      if (resolvedModelKind) form.append("modelKind", resolvedModelKind);
       form.append("tags", JSON.stringify(tags));
       media.forEach((m) => form.append("files", m.file));
 
-      const res = await fetch("/api/posts", { method: "POST", body: form });
-      const data = await res.json();
-      if (!res.ok || !data?.ok) {
-        const msg = data?.error || "Failed to create post";
+      const res = await fetch("/api/posts", {
+        method: "POST",
+        body: form,
+        signal: controller.signal,
+        // credentials are same-origin by default in Next.js; add if needed:
+        // credentials: "same-origin",
+        // Use custom CSRF header in your API if implemented:
+        // headers: { "X-CSRF-Token": csrfToken }
+      });
+
+      let data: any = null;
+      const ct = res.headers.get("content-type") || "";
+      if (ct.includes("application/json")) {
+        try {
+          data = await res.json();
+        } catch {
+          // ignore JSON parse errors
+        }
+      }
+
+      if (!res.ok || data?.ok === false) {
+        const msg = data?.error || `Failed to create post (${res.status})`;
         setError(msg);
         toast.error(msg);
         return;
       }
 
+      stopPostProgress(100);
       toast.success("Post created");
       resetAll();
     } catch (e: any) {
-      const msg = e?.message || "Unexpected error";
-      setError(msg);
-      toast.error(msg);
+      if (e?.name === "AbortError") {
+        setError("Request timed out. Please try again.");
+        toast.error("Request timed out. Please try again.");
+      } else {
+        const msg = e?.message || "Unexpected error";
+        setError(msg);
+        toast.error(msg);
+      }
+    } finally {
+      window.clearTimeout(timeout);
+      postAbortRef.current = null;
+      setIsPosting(false);
+      stopPostProgress();
     }
   };
 
@@ -655,44 +732,82 @@ export default function DashboardCreatePage() {
     setShowErrors(false);
   };
 
+  const headerProgressActive = isOptimizing || isPosting;
+  const headerProgress = isOptimizing ? optState.currentPercent : postProgress;
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background" aria-busy={busy}>
       {/* Sticky header */}
       <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
           <h1 className="text-base font-semibold tracking-tight">Create</h1>
           <div className="flex items-center gap-2">
             <Button
+              type="button"
               variant="ghost"
               className="rounded-full"
               onClick={resetAll}
-              disabled={isOptimizing}
+              disabled={busy}
             >
               Reset
             </Button>
             <Button
+              type="button"
               className="rounded-full px-4"
               disabled={!canPost}
               onClick={handlePost}
             >
-              {isOptimizing ? "Optimizing..." : "Post"}
+              {isPosting ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Posting...
+                </span>
+              ) : isOptimizing ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Optimizing...
+                </span>
+              ) : (
+                "Post"
+              )}
             </Button>
           </div>
         </div>
-        {isOptimizing && (
+
+        {headerProgressActive && (
           <div className="h-[2px] bg-muted relative">
             <div
               className="absolute left-0 top-0 h-full bg-primary transition-[width] duration-150"
-              style={{ width: `${optState.currentPercent}%` }}
+              style={{
+                width: `${Math.min(100, Math.max(0, headerProgress))}%`,
+              }}
             />
           </div>
         )}
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-6 md:py-8">
-        <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-8">
+      <main className="relative max-w-5xl mx-auto px-4 py-6 md:py-8">
+        {/* Subtle blocking overlay while posting */}
+        {isPosting && (
+          <div
+            className="pointer-events-none absolute inset-0 z-20 grid place-items-center bg-background/40 backdrop-blur-sm"
+            aria-hidden
+          >
+            <div className="pointer-events-auto inline-flex items-center gap-2 rounded-full border bg-background/90 px-3 py-1.5 text-sm shadow-sm">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Posting...
+            </div>
+          </div>
+        )}
+
+        <div
+          className={cn(
+            "grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-8",
+            busy && "opacity-95"
+          )}
+        >
           {/* Left: Prompt + Media */}
-          <section>
+          <section aria-disabled={busy}>
             {/* Prompt */}
             <div className="pb-6 border-b">
               <label className="text-sm font-medium flex items-center gap-1">
@@ -703,7 +818,7 @@ export default function DashboardCreatePage() {
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   onKeyDown={(e) => {
-                    if ((e.metaKey || e.ctrlKey) && e.key === "Enter")
+                    if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && !busy)
                       handlePost();
                   }}
                   placeholder="Write your prompt..."
@@ -712,7 +827,7 @@ export default function DashboardCreatePage() {
                     showErrors && !promptValid && "ring-1 ring-destructive"
                   )}
                   aria-invalid={showErrors && !promptValid}
-                  disabled={isOptimizing}
+                  disabled={busy}
                 />
                 <div className="absolute right-2 bottom-2 text-xs select-none tabular-nums">
                   <span
@@ -738,9 +853,10 @@ export default function DashboardCreatePage() {
                 <label className="text-sm font-medium">Attachments</label>
                 {media.length > 0 && (
                   <button
+                    type="button"
                     onClick={clearAllMedia}
                     className="text-sm text-muted-foreground hover:text-foreground"
-                    disabled={isOptimizing}
+                    disabled={busy}
                   >
                     Clear all
                   </button>
@@ -750,7 +866,7 @@ export default function DashboardCreatePage() {
               <div
                 onDragOver={(e) => {
                   e.preventDefault();
-                  if (!isOptimizing) setIsDragging(true);
+                  if (!busy) setIsDragging(true);
                 }}
                 onDragLeave={() => setIsDragging(false)}
                 onDrop={handleDrop}
@@ -758,13 +874,15 @@ export default function DashboardCreatePage() {
                   "mt-3 flex flex-wrap items-center gap-3 rounded-md border border-dashed px-3 py-3 transition",
                   isDragging && "border-primary/40 bg-muted/30"
                 )}
+                aria-label="Drop images to attach"
               >
                 <Button
+                  type="button"
                   variant="ghost"
                   size="sm"
                   className="gap-2"
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={isOptimizing || media.length >= MAX_FILES}
+                  disabled={busy || media.length >= MAX_FILES}
                 >
                   <ImageIcon className="w-4 h-4" />
                   Add images
@@ -776,11 +894,11 @@ export default function DashboardCreatePage() {
                   multiple
                   className="hidden"
                   onChange={handleMediaInput}
-                  disabled={isOptimizing}
+                  disabled={busy}
                 />
                 <span className="text-xs text-muted-foreground">
                   Images only (≤ {IMAGE_MAX_MB}MB each) ·{" "}
-                  {MAX_FILES - media.length} slot(s) left
+                  {Math.max(0, MAX_FILES - media.length)} slot(s) left
                 </span>
               </div>
 
@@ -804,10 +922,13 @@ export default function DashboardCreatePage() {
                         className="group relative overflow-hidden rounded-md border bg-muted"
                       >
                         {isImage ? (
+                          // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={item.url}
                             alt={item.file.name}
                             className="w-full aspect-[4/3] object-cover"
+                            loading="lazy"
+                            decoding="async"
                           />
                         ) : (
                           <video
@@ -817,6 +938,7 @@ export default function DashboardCreatePage() {
                           />
                         )}
                         <button
+                          type="button"
                           onClick={() => removeMediaAt(idx)}
                           className={cn(
                             "absolute top-2 right-2 rounded-full p-1.5",
@@ -825,7 +947,7 @@ export default function DashboardCreatePage() {
                           )}
                           aria-label="Remove media"
                           title="Remove"
-                          disabled={isOptimizing}
+                          disabled={busy}
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -838,7 +960,7 @@ export default function DashboardCreatePage() {
           </section>
 
           {/* Right: Details */}
-          <aside className="md:border-l md:pl-8 space-y-8">
+          <aside className="md:border-l md:pl-8 space-y-8" aria-disabled={busy}>
             {/* Tags */}
             <div className="space-y-2">
               <label className="text-sm font-medium flex items-center gap-1">
@@ -861,10 +983,11 @@ export default function DashboardCreatePage() {
                   >
                     #{tag}
                     <button
+                      type="button"
                       onClick={() => setTags(tags.filter((_, i) => i !== idx))}
                       className="opacity-70 hover:opacity-100"
                       aria-label={`Remove tag ${tag}`}
-                      disabled={isOptimizing}
+                      disabled={busy}
                     >
                       <X className="w-3 h-3" />
                     </button>
@@ -890,9 +1013,10 @@ export default function DashboardCreatePage() {
                   }}
                   placeholder="Add tag and press Enter"
                   className="h-9 min-w-[120px] flex-1 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
-                  disabled={isOptimizing || tags.length >= 5}
+                  disabled={busy || tags.length >= 5}
                 />
               </div>
+
               {/* Custom Provider/Model panel when provider = Others */}
               {provider === "others" ? (
                 <div className="mt-1 rounded-md border bg-muted/30 p-3">
@@ -918,7 +1042,7 @@ export default function DashboardCreatePage() {
                       placeholder="Provider (e.g., OpenAI)"
                       value={customProvider}
                       onChange={(e) => setCustomProvider(e.target.value)}
-                      disabled={isOptimizing}
+                      disabled={busy}
                       className={cn(
                         "h-9",
                         showErrors &&
@@ -931,7 +1055,7 @@ export default function DashboardCreatePage() {
                       placeholder="Model (e.g., GPT-4o)"
                       value={customModel}
                       onChange={(e) => setCustomModel(e.target.value)}
-                      disabled={isOptimizing}
+                      disabled={busy}
                       className={cn(
                         "h-9",
                         showErrors &&
@@ -963,11 +1087,12 @@ export default function DashboardCreatePage() {
                           setCustomModel("");
                           if (val !== "others") setCustomProvider("");
                         }}
-                        disabled={isOptimizing}
+                        disabled={busy}
                       >
                         <SelectTrigger
                           className={cn(
                             "h-9",
+                            "w-full",
                             showErrors &&
                               !providerValid &&
                               "ring-1 ring-destructive"
@@ -994,6 +1119,7 @@ export default function DashboardCreatePage() {
                       <Popover open={modelOpen} onOpenChange={setModelOpen}>
                         <PopoverTrigger asChild>
                           <Button
+                            type="button"
                             variant="outline"
                             role="combobox"
                             aria-expanded={modelOpen}
@@ -1003,7 +1129,7 @@ export default function DashboardCreatePage() {
                                 !modelSelectionValid &&
                                 "ring-1 ring-destructive"
                             )}
-                            disabled={isOptimizing || !provider}
+                            disabled={busy || !provider}
                           >
                             <span className="truncate">
                               {modelKey
@@ -1096,7 +1222,7 @@ export default function DashboardCreatePage() {
                         placeholder="Enter custom model"
                         value={customModel}
                         onChange={(e) => setCustomModel(e.target.value)}
-                        disabled={isOptimizing}
+                        disabled={busy}
                         className={cn(
                           "h-9",
                           showErrors &&
@@ -1149,7 +1275,7 @@ export default function DashboardCreatePage() {
                       placeholder="Category name"
                       value={customCategory}
                       onChange={(e) => setCustomCategory(e.target.value)}
-                      disabled={isOptimizing}
+                      disabled={busy}
                       className={cn(
                         "h-9",
                         showErrors &&
@@ -1162,7 +1288,7 @@ export default function DashboardCreatePage() {
                       placeholder="Subcategory name"
                       value={customSubCategory}
                       onChange={(e) => setCustomSubCategory(e.target.value)}
-                      disabled={isOptimizing}
+                      disabled={busy}
                       className={cn(
                         "h-9",
                         showErrors &&
@@ -1190,7 +1316,7 @@ export default function DashboardCreatePage() {
                         setCustomSubCategory("");
                         if (val !== "Others") setCustomCategory("");
                       }}
-                      disabled={isOptimizing}
+                      disabled={busy}
                     >
                       <SelectTrigger
                         className={cn(
@@ -1220,7 +1346,7 @@ export default function DashboardCreatePage() {
                       <Select
                         value={subCategory}
                         onValueChange={setSubCategory}
-                        disabled={isOptimizing}
+                        disabled={busy}
                       >
                         <SelectTrigger
                           className={cn(
@@ -1270,7 +1396,7 @@ export default function DashboardCreatePage() {
                           placeholder="Enter custom subcategory"
                           value={customSubCategory}
                           onChange={(e) => setCustomSubCategory(e.target.value)}
-                          disabled={isOptimizing}
+                          disabled={busy}
                           className={cn(
                             "h-9 mt-2",
                             showErrors &&
