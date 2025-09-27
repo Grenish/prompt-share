@@ -928,6 +928,8 @@ export function SettingsDialog({
                     key={key}
                     type="button"
                     onClick={() => setActive(key)}
+                    aria-label={label}
+                    aria-current={isActive ? "page" : undefined}
                     className={cn(
                       "relative flex flex-col items-center justify-center p-2 rounded-lg transition-all",
                       "hover:bg-muted/50 active:scale-95",
@@ -935,15 +937,19 @@ export function SettingsDialog({
                     )}
                   >
                     <Icon
+                      aria-hidden="true"
                       className={cn(
                         "h-6 w-6 transition-colors",
                         isActive ? color : "text-muted-foreground"
                       )}
                     />
+                    <span className="sr-only">{label}</span>
                     {isActive && (
                       <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 h-1 w-1 rounded-full bg-primary" />
                     )}
                   </button>
+                );
+              })}
                 );
               })}
             </nav>
