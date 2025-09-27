@@ -10,14 +10,27 @@ type PageProps = {
   params: Promise<{ postId: string }>;
 };
 
+const normalizeString = (value: unknown): string | undefined => {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
 type PostRow = {
   id: string;
   created_at: string | null;
   text: string | null;
   media_urls: string[] | null;
   model_name: string | null;
+  model_label: string | null;
+  model_key: string | null;
+  model_kind: string | null;
+  model_provider: string | null;
+  model_provider_slug: string | null;
   category: string | null;
+  category_slug: string | null;
   sub_category: string | null;
+  sub_category_slug: string | null;
   author: string | null;
 };
 
@@ -40,7 +53,7 @@ export default async function PostPage({ params }: PageProps) {
   const { data: postRow, error: postErr } = await supabase
     .from("posts")
     .select(
-      "id, created_at, text, media_urls, model_name, category, sub_category, author"
+      "id, created_at, text, media_urls, model_name, model_label, model_key, model_kind, model_provider, model_provider_slug, category, category_slug, sub_category, sub_category_slug, author"
     )
     .eq("id", postId)
     .single<PostRow>();
@@ -159,9 +172,16 @@ export default async function PostPage({ params }: PageProps) {
     createdAt: postRow.created_at,
     text: postRow.text ?? "",
     media,
-    modelName: postRow.model_name ?? undefined,
-    category: postRow.category ?? undefined,
-    subCategory: postRow.sub_category ?? undefined,
+    modelName: normalizeString(postRow.model_name),
+    modelLabel: normalizeString(postRow.model_label),
+    modelKey: normalizeString(postRow.model_key),
+    modelKind: normalizeString(postRow.model_kind),
+    modelProvider: normalizeString(postRow.model_provider),
+    modelProviderSlug: normalizeString(postRow.model_provider_slug),
+    category: normalizeString(postRow.category),
+    categorySlug: normalizeString(postRow.category_slug),
+    subCategory: normalizeString(postRow.sub_category),
+    subCategorySlug: normalizeString(postRow.sub_category_slug),
     likesCount: likesCount ?? 0,
     commentCount,
     liked,
