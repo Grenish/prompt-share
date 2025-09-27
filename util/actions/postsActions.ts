@@ -58,12 +58,33 @@ export type PostActionInput = {
   subCategory: string;
   modelName: string;
   tags?: string[];
+  categorySlug?: string;
+  subCategorySlug?: string;
+  modelProviderLabel?: string;
+  modelProviderSlug?: string;
+  modelKey?: string;
+  modelLabel?: string;
+  modelKind?: string;
 };
 
 export type PostActionResult = {
   ok: boolean;
   post?: any;
   error?: string;
+};
+
+const toSlug = (raw: string) =>
+  raw
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+const toNullable = (value: string) => {
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 };
 
 /**
@@ -98,8 +119,39 @@ export async function postAction(
 
     const category = (input.category || "").trim();
     const subCategory = (input.subCategory || "").trim();
-    const modelName = (input.modelName || "").trim();
+    const rawModelName = (input.modelName || "").trim();
     const tags = (input.tags || []).map((t) => t.trim()).filter(Boolean);
+    const modelProviderLabel = (input.modelProviderLabel || "").trim();
+    const modelProviderSlugInput = (input.modelProviderSlug || "").trim();
+    const modelProviderSlug = modelProviderSlugInput
+      ? toSlug(modelProviderSlugInput)
+      : modelProviderLabel
+      ? toSlug(modelProviderLabel)
+      : "";
+    const modelLabelInput = (input.modelLabel || "").trim();
+    const modelLabel = modelLabelInput || rawModelName;
+    const modelKeyInput = (input.modelKey || "").trim();
+    const modelKey = modelKeyInput
+      ? modelKeyInput
+      : modelLabel
+      ? toSlug(modelLabel)
+      : "";
+    const modelKind = (input.modelKind || "").trim();
+    const categorySlugInput = (input.categorySlug || "").trim();
+    const categorySlug = categorySlugInput
+      ? toSlug(categorySlugInput)
+      : category
+      ? toSlug(category)
+      : "";
+    const subCategorySlugInput = (input.subCategorySlug || "").trim();
+    const subCategorySlug = subCategorySlugInput
+      ? toSlug(subCategorySlugInput)
+      : subCategory
+      ? toSlug(subCategory)
+      : "";
+    const modelName = rawModelName
+      ? rawModelName
+      : [modelProviderLabel, modelLabel].filter(Boolean).join(" > ").trim();
 
     // 1) Upload files (if any)
     const mediaUrls: string[] = [];
@@ -152,8 +204,15 @@ export async function postAction(
       category,
       sub_category: subCategory,
       model_name: modelName,
+      model_label: toNullable(modelLabel),
+      model_key: toNullable(modelKey),
+      model_kind: toNullable(modelKind),
+      model_provider: toNullable(modelProviderLabel),
+      model_provider_slug: toNullable(modelProviderSlug),
       media_urls: mediaUrls,
       author: user.id, // RLS/DB default could also be auth.uid(), but we set explicitly
+      category_slug: toNullable(categorySlug),
+      sub_category_slug: toNullable(subCategorySlug),
     };
 
     const { data: insertedPost, error: insertError } = await supabase
