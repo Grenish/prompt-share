@@ -571,7 +571,10 @@ export function SettingsDialog({
                   aria-label="Save changes"
                 >
                   {isSaving(active) ? (
-                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                    <Loader2
+                      className="h-4 w-4 animate-spin"
+                      aria-hidden="true"
+                    />
                   ) : (
                     <Check className="h-4 w-4" aria-hidden="true" />
                   )}
@@ -948,8 +951,6 @@ export function SettingsDialog({
                       <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 h-1 w-1 rounded-full bg-primary" />
                     )}
                   </button>
-                );
-              })}
                 );
               })}
             </nav>
