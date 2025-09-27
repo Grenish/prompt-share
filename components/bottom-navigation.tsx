@@ -16,7 +16,7 @@ const navItems = [
   { title: "Home", href: "/home", icon: Home },
   { title: "Explore", href: "/home/explore", icon: Search },
   { title: "Leaderboard", href: "/home/leaderboard", icon: Award },
-  { title: "Notifications", href: "/home/notification", icon: Bell },
+  { title: "Notifications", href: "/home/notifications", icon: Bell },
   { title: "Profile", href: "/home/profile", icon: UserIcon },
   { title: "Create", href: "/home/create", icon: Plus, special: true },
 ];
