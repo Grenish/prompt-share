@@ -4,6 +4,53 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "../supabase/server";
 import { toStoragePath } from "@/util/storage/helpers";
 
+type ActionBaseResult = {
+  ok: boolean;
+  error?: string;
+};
+
+export type TogglePostLikeResult = ActionBaseResult & {
+  liked?: boolean;
+  likes?: number;
+};
+
+export type TogglePostSaveResult = ActionBaseResult & {
+  saved?: boolean;
+};
+
+export type PostCommentPayload = {
+  id: string;
+  text: string;
+  createdAt: string;
+  user: {
+    id: string;
+    name: string;
+    username?: string;
+    avatarUrl?: string;
+  };
+};
+
+export type CreatePostCommentResult = ActionBaseResult & {
+  comment?: PostCommentPayload;
+  commentsCount?: number;
+};
+
+export type GetPostCommentsResult = ActionBaseResult & {
+  comments?: PostCommentPayload[];
+};
+
+export type PostEngagementSummary = {
+  postId: string;
+  likes: number;
+  comments: number;
+  liked: boolean;
+  saved: boolean;
+};
+
+export type GetPostEngagementResult = ActionBaseResult & {
+  items?: PostEngagementSummary[];
+};
+
 export type PostActionInput = {
   text: string;
   files?: File[];
@@ -252,4 +299,317 @@ export async function deletePosts(postId: string): Promise<PostActionResult> {
   revalidatePath("/home/profile");
 
   return { ok: true };
+}
+
+function resolveProfileDisplay(
+  profile:
+    | {
+        full_name?: string | null;
+        username?: string | null;
+        avatar_url?: string | null;
+      }
+    | null
+    | undefined,
+  fallback?: string | null
+) {
+  const name = profile?.full_name?.trim();
+  const handle = profile?.username?.trim();
+  const display = name || handle || fallback || "User";
+  return {
+    name: display,
+    username: handle || undefined,
+    avatarUrl: profile?.avatar_url || undefined,
+  };
+}
+
+export async function togglePostLike(
+  postId: string,
+  like: boolean
+): Promise<TogglePostLikeResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return { ok: false, error: "Not authenticated" };
+  }
+
+  if (!postId) {
+    return { ok: false, error: "Invalid post id" };
+  }
+
+  if (like) {
+    const { error } = await supabase
+      .from("post_likes")
+      .insert({ post_id: postId, user_id: user.id });
+    if (error && error.code !== "23505") {
+      return { ok: false, error: error.message };
+    }
+  } else {
+    const { error } = await supabase
+      .from("post_likes")
+      .delete()
+      .eq("post_id", postId)
+      .eq("user_id", user.id);
+    if (error) {
+      return { ok: false, error: error.message };
+    }
+  }
+
+  const { count } = await supabase
+    .from("post_likes")
+    .select("post_id", { count: "exact", head: true })
+    .eq("post_id", postId);
+
+  return { ok: true, liked: like, likes: count ?? 0 };
+}
+
+export async function togglePostSave(
+  postId: string,
+  save: boolean
+): Promise<TogglePostSaveResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return { ok: false, error: "Not authenticated" };
+  }
+
+  if (!postId) {
+    return { ok: false, error: "Invalid post id" };
+  }
+
+  if (save) {
+    const { error } = await supabase
+      .from("post_saves")
+      .insert({ post_id: postId, user_id: user.id });
+    if (error && error.code !== "23505") {
+      return { ok: false, error: error.message };
+    }
+  } else {
+    const { error } = await supabase
+      .from("post_saves")
+      .delete()
+      .eq("post_id", postId)
+      .eq("user_id", user.id);
+    if (error) {
+      return { ok: false, error: error.message };
+    }
+  }
+
+  return { ok: true, saved: save };
+}
+
+export async function createPostComment(
+  postId: string,
+  text: string
+): Promise<CreatePostCommentResult> {
+  const body = (text || "").trim();
+  if (!postId) {
+    return { ok: false, error: "Invalid post id" };
+  }
+  if (!body) {
+    return { ok: false, error: "Comment cannot be empty" };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return { ok: false, error: "Not authenticated" };
+  }
+
+  const { data: inserted, error } = await supabase
+    .from("post_comments")
+    .insert({ post_id: postId, user_id: user.id, content: body })
+    .select("id, created_at, content")
+    .single();
+
+  if (error || !inserted) {
+    return { ok: false, error: error?.message || "Failed to add comment" };
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name, username, avatar_url")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const identity = resolveProfileDisplay(profile, user.email);
+
+  const { count: commentsCount } = await supabase
+    .from("post_comments")
+    .select("id", { count: "exact", head: true })
+    .eq("post_id", postId);
+
+  return {
+    ok: true,
+    comment: {
+      id: String(inserted.id),
+      text: inserted.content ?? body,
+      createdAt: inserted.created_at ?? new Date().toISOString(),
+      user: {
+        id: String(user.id),
+        ...identity,
+      },
+    },
+    commentsCount: commentsCount ?? 0,
+  };
+}
+
+export async function getPostComments(
+  postId: string
+): Promise<GetPostCommentsResult> {
+  if (!postId) {
+    return { ok: false, error: "Invalid post id" };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("post_comments")
+    .select("id, content, created_at, user_id")
+    .eq("post_id", postId)
+    .order("created_at", { ascending: false });
+
+  if (error || !data) {
+    return { ok: false, error: error?.message || "Failed to load comments" };
+  }
+
+  const userIds = Array.from(
+    new Set(
+      data
+        .map((row) => row.user_id)
+        .filter((id): id is string => typeof id === "string")
+    )
+  );
+
+  const profilesMap = new Map<string, ReturnType<typeof resolveProfileDisplay>>();
+
+  if (userIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, full_name, username, avatar_url")
+      .in("id", userIds);
+
+    for (const profile of profiles || []) {
+      profilesMap.set(
+        String(profile.id),
+        resolveProfileDisplay(profile, undefined)
+      );
+    }
+  }
+
+  return {
+    ok: true,
+    comments: data.map((row) => {
+      const identity = profilesMap.get(String(row.user_id)) || {
+        name: "User",
+        username: undefined,
+        avatarUrl: undefined,
+      };
+      return {
+        id: String(row.id),
+        text: row.content ?? "",
+        createdAt: row.created_at ?? new Date().toISOString(),
+        user: {
+          id: String(row.user_id || ""),
+          ...identity,
+        },
+      } satisfies PostCommentPayload;
+    }),
+  };
+}
+
+export async function getPostEngagement(
+  postIds: string[]
+): Promise<GetPostEngagementResult> {
+  const uniqueIds = Array.from(new Set(postIds.filter(Boolean)));
+  if (uniqueIds.length === 0) {
+    return { ok: true, items: [] };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const viewerId = user?.id ?? null;
+
+  const { data: likeRows, error: likesError } = await supabase
+    .from("post_likes")
+    .select("post_id, user_id")
+    .in("post_id", uniqueIds);
+
+  if (likesError) {
+    return { ok: false, error: likesError.message };
+  }
+
+  const { data: commentRows, error: commentsError } = await supabase
+    .from("post_comments")
+    .select("post_id")
+    .in("post_id", uniqueIds);
+
+  if (commentsError) {
+    return { ok: false, error: commentsError.message };
+  }
+
+  let saveRows: { post_id: string }[] = [];
+  if (viewerId) {
+    const { data: savesData, error: savesError } = await supabase
+      .from("post_saves")
+      .select("post_id")
+      .eq("user_id", viewerId)
+      .in("post_id", uniqueIds);
+
+    if (savesError) {
+      return { ok: false, error: savesError.message };
+    }
+
+    saveRows = (savesData || []).map((row) => ({ post_id: row.post_id }));
+  }
+
+  const map = new Map<string, PostEngagementSummary>();
+  for (const id of uniqueIds) {
+    map.set(id, {
+      postId: id,
+      likes: 0,
+      comments: 0,
+      liked: false,
+      saved: false,
+    });
+  }
+
+  for (const row of likeRows || []) {
+    const key = String(row.post_id);
+    const entry = map.get(key);
+    if (!entry) continue;
+    entry.likes += 1;
+    if (viewerId && row.user_id === viewerId) {
+      entry.liked = true;
+    }
+  }
+
+  for (const row of commentRows || []) {
+    const key = String(row.post_id);
+    const entry = map.get(key);
+    if (!entry) continue;
+    entry.comments += 1;
+  }
+
+  if (viewerId) {
+    for (const row of saveRows || []) {
+      const key = String(row.post_id);
+      const entry = map.get(key);
+      if (entry) entry.saved = true;
+    }
+  }
+
+  return { ok: true, items: Array.from(map.values()) };
 }
