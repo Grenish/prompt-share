@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import BackButton from "@/components/back-button";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { CommentsList } from "@/components/post/comments-list";
 import {
   togglePostLike,
   togglePostSave,
@@ -43,8 +44,15 @@ export type MobilePost = {
   text: string;
   media: string[];
   modelName?: string;
+  modelLabel?: string;
+  modelKey?: string;
+  modelKind?: string;
+  modelProvider?: string;
+  modelProviderSlug?: string;
   category?: string;
   subCategory?: string;
+  categorySlug?: string;
+  subCategorySlug?: string;
   author?: {
     id: string;
     name: string;
@@ -95,6 +103,63 @@ function formatFullTimestamp(
     return d.toISOString();
   }
 }
+
+type MobileMetaChip = {
+  key: string;
+  prefix: string;
+  value: string;
+};
+
+function formatMetaValue(raw?: string | null) {
+  if (typeof raw !== "string") return "";
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  if (/[\s]/.test(trimmed)) return trimmed;
+  return trimmed
+    .split(/[-_]/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function derivePostMetaChips(post: MobilePost): MobileMetaChip[] {
+  const chips: MobileMetaChip[] = [];
+  const seen = new Set<string>();
+  const add = (key: string, prefix: string, raw?: string | null) => {
+    const value = formatMetaValue(raw);
+    if (!value) return;
+    const dedupeKey = `${prefix}|${value}`;
+    if (seen.has(dedupeKey)) return;
+    seen.add(dedupeKey);
+    chips.push({ key, prefix, value });
+  };
+
+  add("provider", "Provider", post.modelProvider ?? post.modelProviderSlug);
+  add(
+    "model",
+    "Model",
+    post.modelLabel ?? post.modelName ?? post.modelKey
+  );
+  add("kind", "Type", post.modelKind);
+  add("category", "Category", post.category ?? post.categorySlug);
+  add(
+    "subCategory",
+    "Subcategory",
+    post.subCategory ?? post.subCategorySlug
+  );
+
+  return chips;
+}
+
+const MetaChip = ({ prefix, value }: { prefix: string; value: string }) => (
+  <span
+    className="inline-flex max-w-[200px] items-center gap-1 rounded-full border border-border/60 bg-muted/60 px-2.5 py-0.5 text-[11px] text-muted-foreground"
+    title={`${prefix}: ${value}`}
+  >
+    <span className="font-medium text-foreground">{prefix}</span>
+    <span className="truncate">{value}</span>
+  </span>
+);
 
 function isVideoUrl(url: string) {
   const lower = url.toLowerCase();
@@ -516,6 +581,7 @@ export function MobilePostView({ post }: { post: MobilePost }) {
   const [commentInput, setCommentInput] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const commentInputRef = React.useRef<HTMLTextAreaElement | null>(null);
+  const metaChips = React.useMemo(() => derivePostMetaChips(post), [post]);
 
   React.useEffect(() => {
     setLiked(Boolean(post.liked));
@@ -620,23 +686,15 @@ export function MobilePostView({ post }: { post: MobilePost }) {
           <MediaInline media={post.media} onOpenViewer={openViewer} />
         )}
 
-        {(post.category || post.subCategory || post.modelName) && (
+        {metaChips.length > 0 && (
           <div className="flex flex-wrap gap-1.5 pt-1">
-            {post.modelName && (
-              <span className="rounded-full border bg-muted/60 px-2 py-0.5 text-xs">
-                {post.modelName}
-              </span>
-            )}
-            {post.category && (
-              <span className="rounded-full border bg-muted/60 px-2 py-0.5 text-xs">
-                {post.category}
-              </span>
-            )}
-            {post.subCategory && (
-              <span className="rounded-full border bg-muted/60 px-2 py-0.5 text-xs">
-                {post.subCategory}
-              </span>
-            )}
+            {metaChips.map((chip) => (
+              <MetaChip
+                key={chip.key}
+                prefix={chip.prefix}
+                value={chip.value}
+              />
+            ))}
           </div>
         )}
 
@@ -686,35 +744,11 @@ export function MobilePostView({ post }: { post: MobilePost }) {
             </Button>
           </div>
 
-          {comments.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No comments yet</p>
-          ) : (
-            <div className="space-y-4">
-              {comments.map((comment) => (
-                <div key={comment.id} className="flex gap-3">
-                  <Avatar
-                    name={comment.author.name}
-                    url={comment.author.avatarUrl}
-                    size={32}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                      <span className="font-semibold text-foreground">
-                        {comment.author.name}
-                      </span>
-                      {comment.author.username && (
-                        <span>@{comment.author.username}</span>
-                      )}
-                      <span>{formatRelativeTime(comment.createdAt)}</span>
-                    </div>
-                    <p className="mt-1 text-sm text-foreground leading-relaxed">
-                      {comment.text}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <CommentsList
+            comments={comments}
+            relativeTimeFormatter={formatRelativeTime}
+            avatarSize={32}
+          />
         </div>
       </div>
 
