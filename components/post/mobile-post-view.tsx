@@ -3,6 +3,15 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import BackButton from "@/components/back-button";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  togglePostLike,
+  togglePostSave,
+  createPostComment,
+  type PostCommentPayload,
+} from "@/util/actions/postsActions";
+import { toast } from "sonner";
 import {
   Bookmark,
   Heart,
@@ -15,6 +24,18 @@ import {
   ChevronRight,
   ArrowLeft,
 } from "lucide-react";
+
+export type MobilePostComment = {
+  id: string;
+  text: string;
+  createdAt: string | number | Date;
+  author: {
+    id: string;
+    name: string;
+    username?: string;
+    avatarUrl?: string;
+  };
+};
 
 export type MobilePost = {
   id: string;
@@ -30,6 +51,11 @@ export type MobilePost = {
     username?: string;
     avatarUrl?: string;
   };
+  liked?: boolean;
+  saved?: boolean;
+  likesCount?: number;
+  commentCount?: number;
+  comments?: MobilePostComment[];
 };
 
 function formatRelativeTime(
@@ -391,18 +417,30 @@ function useShareCurrentUrl() {
   }, []);
 }
 
-function ActionsRow({ onShare }: { onShare: () => void }) {
-  const [liked, setLiked] = React.useState(false);
-  const [saved, setSaved] = React.useState(false);
+function ActionsRow({
+  liked,
+  saved,
+  onLike,
+  onSave,
+  onShare,
+  onComment,
+}: {
+  liked: boolean;
+  saved: boolean;
+  onLike: () => void | Promise<void>;
+  onSave: () => void | Promise<void>;
+  onShare: () => void;
+  onComment: () => void;
+}) {
   return (
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-1.5">
-        <IconButton aria-label="Reply">
+        <IconButton aria-label="Reply" onClick={onComment}>
           <MessageCircle className="h-5 w-5" />
         </IconButton>
         <IconButton
           aria-label={liked ? "Unlike" : "Like"}
-          onClick={() => setLiked((v) => !v)}
+          onClick={onLike}
           className={liked ? "text-rose-500" : undefined}
         >
           <Heart className={cn("h-5 w-5", liked && "fill-current")} />
@@ -413,7 +451,7 @@ function ActionsRow({ onShare }: { onShare: () => void }) {
       </div>
       <IconButton
         aria-label={saved ? "Remove bookmark" : "Bookmark"}
-        onClick={() => setSaved((v) => !v)}
+        onClick={onSave}
         className={saved ? "text-primary" : undefined}
       >
         <Bookmark className={cn("h-5 w-5", saved && "fill-current")} />
@@ -466,11 +504,103 @@ export function MobilePostView({ post }: { post: MobilePost }) {
   const onShare = useShareCurrentUrl();
   const [lightboxOpen, setLightboxOpen] = React.useState(false);
   const [lightboxIndex, setLightboxIndex] = React.useState(0);
+  const [liked, setLiked] = React.useState(Boolean(post.liked));
+  const [saved, setSaved] = React.useState(Boolean(post.saved));
+  const [likesCount, setLikesCount] = React.useState(post.likesCount ?? 0);
+  const [commentCount, setCommentCount] = React.useState(
+    post.commentCount ?? post.comments?.length ?? 0
+  );
+  const [comments, setComments] = React.useState<MobilePostComment[]>(
+    post.comments ?? []
+  );
+  const [commentInput, setCommentInput] = React.useState("");
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const commentInputRef = React.useRef<HTMLTextAreaElement | null>(null);
+
+  React.useEffect(() => {
+    setLiked(Boolean(post.liked));
+    setSaved(Boolean(post.saved));
+    setLikesCount(post.likesCount ?? 0);
+    setCommentCount(post.commentCount ?? post.comments?.length ?? 0);
+    setComments(post.comments ?? []);
+  }, [post]);
 
   const openViewer = (i: number) => {
     setLightboxIndex(i);
     setLightboxOpen(true);
   };
+
+  const focusCommentInput = React.useCallback(() => {
+    commentInputRef.current?.focus();
+  }, []);
+
+  const toMobileComment = React.useCallback(
+    (payload: PostCommentPayload): MobilePostComment => ({
+      id: payload.id,
+      text: payload.text,
+      createdAt: payload.createdAt,
+      author: {
+        id: payload.user.id,
+        name: payload.user.name,
+        username: payload.user.username,
+        avatarUrl: payload.user.avatarUrl,
+      },
+    }),
+    []
+  );
+
+  const handleToggleLike = React.useCallback(async () => {
+    const next = !liked;
+    setLiked(next);
+    setLikesCount((prev) => Math.max(0, prev + (next ? 1 : -1)));
+    try {
+      const res = await togglePostLike(post.id, next);
+      if (!res.ok) throw new Error(res.error ?? "Couldn't update like");
+      if (typeof res.likes === "number") {
+        setLikesCount(res.likes);
+      }
+    } catch (error) {
+      setLiked(!next);
+      setLikesCount((prev) => Math.max(0, prev + (next ? -1 : 1)));
+      toast.error((error as Error).message || "Couldn't update like");
+    }
+  }, [liked, post.id]);
+
+  const handleToggleSave = React.useCallback(async () => {
+    const next = !saved;
+    setSaved(next);
+    try {
+      const res = await togglePostSave(post.id, next);
+      if (!res.ok) throw new Error(res.error ?? "Couldn't update save");
+      if (typeof res.saved === "boolean") setSaved(res.saved);
+    } catch (error) {
+      setSaved(!next);
+      toast.error((error as Error).message || "Couldn't update save");
+    }
+  }, [saved, post.id]);
+
+  const handleSubmitComment = React.useCallback(async () => {
+    const body = commentInput.trim();
+    if (!body) return;
+    setIsSubmitting(true);
+    setCommentInput("");
+    try {
+      const res = await createPostComment(post.id, body);
+      if (!res.ok || !res.comment) {
+        throw new Error(res.error ?? "Couldn't post comment");
+      }
+      const mapped = toMobileComment(res.comment);
+      setComments((prev) => [mapped, ...prev]);
+      setCommentCount((prev) =>
+        res.commentsCount != null ? res.commentsCount : prev + 1
+      );
+    } catch (error) {
+      toast.error((error as Error).message || "Couldn't post comment");
+      setCommentInput(body);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [commentInput, post.id, toMobileComment]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -518,7 +648,74 @@ export function MobilePostView({ post }: { post: MobilePost }) {
 
         <div className="border-b" />
 
-        <ActionsRow onShare={onShare} />
+        <ActionsRow
+          liked={liked}
+          saved={saved}
+          onLike={handleToggleLike}
+          onSave={handleToggleSave}
+          onShare={onShare}
+          onComment={focusCommentInput}
+        />
+
+        <div className="text-xs text-muted-foreground flex items-center gap-3">
+          <span>
+            {likesCount} {likesCount === 1 ? "like" : "likes"}
+          </span>
+          <span>
+            {commentCount} {commentCount === 1 ? "comment" : "comments"}
+          </span>
+        </div>
+
+        <div className="space-y-4 rounded-2xl border bg-muted/30 p-4">
+          <h3 className="text-sm font-semibold">Comments</h3>
+          <div className="flex items-start gap-3">
+            <Textarea
+              ref={commentInputRef}
+              value={commentInput}
+              onChange={(e) => setCommentInput(e.target.value)}
+              placeholder="Add a comment..."
+              className="min-h-[56px] flex-1 resize-none"
+            />
+            <Button
+              type="button"
+              onClick={handleSubmitComment}
+              disabled={isSubmitting || !commentInput.trim()}
+              size="sm"
+            >
+              Post
+            </Button>
+          </div>
+
+          {comments.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No comments yet</p>
+          ) : (
+            <div className="space-y-4">
+              {comments.map((comment) => (
+                <div key={comment.id} className="flex gap-3">
+                  <Avatar
+                    name={comment.author.name}
+                    url={comment.author.avatarUrl}
+                    size={32}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      <span className="font-semibold text-foreground">
+                        {comment.author.name}
+                      </span>
+                      {comment.author.username && (
+                        <span>@{comment.author.username}</span>
+                      )}
+                      <span>{formatRelativeTime(comment.createdAt)}</span>
+                    </div>
+                    <p className="mt-1 text-sm text-foreground leading-relaxed">
+                      {comment.text}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Lightbox viewer (Twitter-like full screen) */}
