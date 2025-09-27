@@ -5,13 +5,8 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { PostFeed, type Post as FeedPost } from "@/components/post-feed";
 import { UserButton } from "@/components/userButton";
 
-// Server component that renders the authenticated user's home feed.
-// Minimal, read-only implementation: fetch recent posts + author profiles.
-// NOTE: We intentionally avoid complex joins for tags / likes until schema confirmed.
-
 export default async function DashboardHomePage() {
   const supabase = await createClient();
-
   const { data, error } = await supabase.auth.getUser();
 
   if (error || !data.user) {
@@ -19,23 +14,21 @@ export default async function DashboardHomePage() {
   }
 
   const user = normalizeUser(data.user);
-
   const viewerId = user?.id;
   const viewerDisplayName = user?.displayName;
 
-  // Fetch list of users the viewer follows
   const { data: followingRows } = await supabase
     .from("follows")
     .select("following_id")
     .eq("follower_id", viewerId)
     .limit(500);
+
   const followedIds = new Set<string>(
     (followingRows || [])
-      .map((r: any) => String((r as any).following_id))
+      .map((r: any) => String(r.following_id))
       .filter(Boolean)
   );
 
-  // Fetch recent posts (single query ordered by time)
   const { data: postRows, error: postsError } = await supabase
     .from("posts")
     .select(
@@ -44,7 +37,6 @@ export default async function DashboardHomePage() {
     .order("created_at", { ascending: false })
     .limit(30);
 
-  // Map authors to fetch profile info (username, full_name, avatar)
   const authorIds = Array.from(
     new Set(
       (postRows || [])
@@ -62,17 +54,19 @@ export default async function DashboardHomePage() {
       bio: string | null;
     }
   >();
+
   if (authorIds.length > 0) {
     const { data: profiles } = await supabase
       .from("profiles")
       .select("id, username, full_name, avatar_url, bio")
       .in("id", authorIds);
+
     for (const p of profiles || []) {
-      profilesMap.set(String((p as any).id), {
-        username: (p as any).username ?? null,
-        full_name: (p as any).full_name ?? null,
-        avatar_url: (p as any).avatar_url ?? null,
-        bio: (p as any).bio ?? null,
+      profilesMap.set(String(p.id), {
+        username: p.username ?? null,
+        full_name: p.full_name ?? null,
+        avatar_url: p.avatar_url ?? null,
+        bio: p.bio ?? null,
       });
     }
   }
@@ -90,6 +84,7 @@ export default async function DashboardHomePage() {
     const mediaUrls: string[] = Array.isArray(row.media_urls)
       ? (row.media_urls as string[]).filter(Boolean)
       : [];
+
     return {
       id: pid,
       user: {
@@ -102,17 +97,15 @@ export default async function DashboardHomePage() {
       createdAt: row.created_at || new Date().toISOString(),
       text: row.text || undefined,
       attachments: mediaUrls.map((url) => {
-        // Infer media type by file extension (best-effort; DB stores string URLs only)
         const clean = String(url).split("?")[0].toLowerCase();
         const isVideo = /\.(mp4|webm|ogg|mov|m4v)$/.test(clean);
-        const mediaType: "image" | "video" = isVideo ? "video" : "image";
         return {
           id: url,
-          type: mediaType,
+          type: isVideo ? "video" : "image",
           url,
         };
       }),
-      tags: [], // Tag enrichment skipped (minimal implementation)
+      tags: [],
       meta: {
         model: row.model_name || undefined,
         category: row.category || undefined,
@@ -124,44 +117,41 @@ export default async function DashboardHomePage() {
     } satisfies FeedPost;
   });
 
-  // Reorder so followed users' posts appear first while preserving
-  // relative recency inside each bucket (since base posts are already
-  // sorted by created_at desc) – stable partition.
   const followedPosts: FeedPost[] = [];
   const otherPosts: FeedPost[] = [];
+
   for (const p of basePosts) {
     if (followedIds.has(p.user.id)) followedPosts.push(p);
     else otherPosts.push(p);
   }
+
   const finalFeed = [...followedPosts, ...otherPosts];
 
-  // ---------------- Enrich with counts (posts / followers / following) ----------------
-  // Collect unique author IDs
   const authorIdSet = new Set<string>(
     finalFeed.map((p) => p.user.id).filter(Boolean)
   );
   const authorIdList = Array.from(authorIdSet);
 
   if (authorIdList.length > 0) {
-    // 1. Posts count per author: fetch authors then count occurrences client-side (Postgrest grouping is limited without RPC)
     const { data: postsAuthorRows } = await supabase
       .from("posts")
       .select("author")
       .in("author", authorIdList);
+
     const postsCountMap = new Map<string, number>();
     for (const r of postsAuthorRows || []) {
-      const aid = String((r as any).author);
+      const aid = String(r.author);
       postsCountMap.set(aid, (postsCountMap.get(aid) || 0) + 1);
     }
 
-    // 2. Followers count (people who follow this author) & Following count (people this author follows)
     const { data: followersRows } = await supabase
       .from("follows")
       .select("following_id", { count: "exact" })
       .in("following_id", authorIdList);
+
     const followersMap = new Map<string, number>();
     for (const r of followersRows || []) {
-      const key = String((r as any).following_id);
+      const key = String(r.following_id);
       followersMap.set(key, (followersMap.get(key) || 0) + 1);
     }
 
@@ -169,13 +159,13 @@ export default async function DashboardHomePage() {
       .from("follows")
       .select("follower_id", { count: "exact" })
       .in("follower_id", authorIdList);
+
     const followingMap = new Map<string, number>();
     for (const r of followingRowsCounts || []) {
-      const key = String((r as any).follower_id);
+      const key = String(r.follower_id);
       followingMap.set(key, (followingMap.get(key) || 0) + 1);
     }
 
-    // Attach counts to finalFeed
     for (const p of finalFeed) {
       p.user.postsCount = postsCountMap.get(p.user.id) ?? 0;
       p.user.followersCount = followersMap.get(p.user.id) ?? 0;
