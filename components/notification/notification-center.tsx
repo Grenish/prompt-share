@@ -69,7 +69,7 @@ function iconStyles(category?: NotificationItem["category"], read?: boolean) {
 }
 
 export const NotificationCenter: React.FC<NotificationCenterProps> = ({
-  notifications,
+  notifications = [],
   onClickNotification,
   showTimestamps = true,
   className,
