@@ -5,9 +5,10 @@ import { useEffect, useRef, useState } from "react";
 
 interface DisplayPromptBoxProps {
   className?: string;
+  prompt: string;
 }
 
-export default function DisplayPromptBox({ className }: DisplayPromptBoxProps) {
+export default function DisplayPromptBox({ className, prompt }: DisplayPromptBoxProps) {
   const pRef = useRef<HTMLParagraphElement | null>(null);
   const [inView, setInView] = useState(false);
 
@@ -36,8 +37,7 @@ export default function DisplayPromptBox({ className }: DisplayPromptBoxProps) {
     return () => observer.disconnect();
   }, []);
 
-  const text =
-    "A surreal lone figure stands in a vast barren landscape, gazing upward at ethereal floating letters suspended in the air. The scene feels muted, dreamlike, and otherworldly, with soft desaturated tones and a quiet, abstract atmosphere. Perfect for conceptual, symbolic imagery.";
+  const text = prompt
 
   const words = text.split(" ");
 
