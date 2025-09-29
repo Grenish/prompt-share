@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter } from 'nextjs-toploader/app';
 import { type PropsWithChildren } from "react";
 
 type BackButtonProps = PropsWithChildren<{

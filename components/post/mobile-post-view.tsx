@@ -3,9 +3,8 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import BackButton from "@/components/back-button";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { CommentsList } from "@/components/post/comments-list";
+import { CommentBox } from "@/components/post/comment-box";
 import {
   togglePostLike,
   togglePostSave,
@@ -135,18 +134,10 @@ function derivePostMetaChips(post: MobilePost): MobileMetaChip[] {
   };
 
   add("provider", "Provider", post.modelProvider ?? post.modelProviderSlug);
-  add(
-    "model",
-    "Model",
-    post.modelLabel ?? post.modelName ?? post.modelKey
-  );
+  add("model", "Model", post.modelLabel ?? post.modelName ?? post.modelKey);
   add("kind", "Type", post.modelKind);
   add("category", "Category", post.category ?? post.categorySlug);
-  add(
-    "subCategory",
-    "Subcategory",
-    post.subCategory ?? post.subCategorySlug
-  );
+  add("subCategory", "Subcategory", post.subCategory ?? post.subCategorySlug);
 
   return chips;
 }
@@ -500,15 +491,15 @@ function ActionsRow({
   return (
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-1.5">
-        <IconButton aria-label="Reply" onClick={onComment}>
-          <MessageCircle className="h-5 w-5" />
-        </IconButton>
         <IconButton
           aria-label={liked ? "Unlike" : "Like"}
           onClick={onLike}
           className={liked ? "text-rose-500" : undefined}
         >
           <Heart className={cn("h-5 w-5", liked && "fill-current")} />
+        </IconButton>
+        <IconButton aria-label="Reply" onClick={onComment}>
+          <MessageCircle className="h-5 w-5" />
         </IconButton>
         <IconButton aria-label="Share" onClick={onShare}>
           <Share2 className="h-5 w-5" />
@@ -645,28 +636,32 @@ export function MobilePostView({ post }: { post: MobilePost }) {
     }
   }, [saved, post.id]);
 
-  const handleSubmitComment = React.useCallback(async () => {
-    const body = commentInput.trim();
-    if (!body) return;
-    setIsSubmitting(true);
-    setCommentInput("");
-    try {
-      const res = await createPostComment(post.id, body);
-      if (!res.ok || !res.comment) {
-        throw new Error(res.error ?? "Couldn't post comment");
+  const handleSubmitComment = React.useCallback(
+    async (rawText?: string) => {
+      const source = rawText ?? commentInput;
+      const body = source.trim();
+      if (!body) return;
+      setIsSubmitting(true);
+      setCommentInput("");
+      try {
+        const res = await createPostComment(post.id, body);
+        if (!res.ok || !res.comment) {
+          throw new Error(res.error ?? "Couldn't post comment");
+        }
+        const mapped = toMobileComment(res.comment);
+        setComments((prev) => [mapped, ...prev]);
+        setCommentCount((prev) =>
+          res.commentsCount != null ? res.commentsCount : prev + 1
+        );
+      } catch (error) {
+        toast.error((error as Error).message || "Couldn't post comment");
+        setCommentInput(source);
+      } finally {
+        setIsSubmitting(false);
       }
-      const mapped = toMobileComment(res.comment);
-      setComments((prev) => [mapped, ...prev]);
-      setCommentCount((prev) =>
-        res.commentsCount != null ? res.commentsCount : prev + 1
-      );
-    } catch (error) {
-      toast.error((error as Error).message || "Couldn't post comment");
-      setCommentInput(body);
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [commentInput, post.id, toMobileComment]);
+    },
+    [commentInput, post.id, toMobileComment]
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -726,23 +721,15 @@ export function MobilePostView({ post }: { post: MobilePost }) {
 
         <div className="space-y-4 rounded-2xl border bg-muted/30 p-4">
           <h3 className="text-sm font-semibold">Comments</h3>
-          <div className="flex items-start gap-3">
-            <Textarea
-              ref={commentInputRef}
-              value={commentInput}
-              onChange={(e) => setCommentInput(e.target.value)}
-              placeholder="Add a comment..."
-              className="min-h-[56px] flex-1 resize-none"
-            />
-            <Button
-              type="button"
-              onClick={handleSubmitComment}
-              disabled={isSubmitting || !commentInput.trim()}
-              size="sm"
-            >
-              Post
-            </Button>
-          </div>
+          <CommentBox
+            ref={commentInputRef}
+            value={commentInput}
+            onChange={setCommentInput}
+            onSubmit={handleSubmitComment}
+            isSubmitting={isSubmitting}
+            placeholder="Add a comment..."
+            className="flex-1"
+          />
 
           <CommentsList
             comments={comments}

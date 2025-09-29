@@ -3,7 +3,7 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { useActionState, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from 'nextjs-toploader/app';
 import { toggleFollow, getFollowStateFor, type FollowActionState } from "@/util/actions/followActions";
 
 export function FollowButton({ targetUserId }: { targetUserId: string }) {

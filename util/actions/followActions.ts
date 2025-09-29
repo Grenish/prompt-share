@@ -2,6 +2,7 @@
 
 import { createClient } from "../supabase/server";
 import { revalidatePath } from "next/cache";
+import { enqueueNotification } from "./notificationsActions";
 
 export type FollowActionState = {
   ok: boolean;
@@ -67,6 +68,8 @@ export async function toggleFollow(
     return { ok: false, following: false, error: existingErr.message };
   }
 
+  let createdFollow = false;
+
   if (existing?.id) {
     // Unfollow
     const { error: delErr } = await supabase
@@ -80,6 +83,7 @@ export async function toggleFollow(
       .from("follows")
       .insert({ follower_id: user.id, following_id: targetUserId });
     if (insErr) return { ok: false, following: false, error: insErr.message };
+    createdFollow = true;
   }
 
   const { followers, following } = await getFollowStateFor(targetUserId);
@@ -91,11 +95,29 @@ export async function toggleFollow(
       .select("username")
       .eq("id", targetUserId)
       .maybeSingle();
-    const targetUsername = (targetProfile as any)?.username as string | undefined;
+    const targetUsername = (targetProfile as any)?.username as
+      | string
+      | undefined;
     revalidatePath("/home/explore");
     if (targetUsername) revalidatePath(`/home/profile/${targetUsername}`);
     revalidatePath("/home/profile"); // viewer's own counts
   } catch {}
+
+  if (createdFollow) {
+    const { ok: notifyOk, error: notifyError } = await enqueueNotification({
+      userId: targetUserId,
+      actorId: user.id,
+      type: "follow",
+      payload: {
+        targetType: "profile",
+        targetId: user.id,
+      },
+    });
+
+    if (!notifyOk && notifyError) {
+      console.error("Failed to send follow notification", notifyError);
+    }
+  }
 
   return { ok: true, following, followers };
 }

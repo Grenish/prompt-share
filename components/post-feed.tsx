@@ -11,7 +11,6 @@ import {
   ChevronLeft,
   ChevronRight,
   CheckCircle2,
-  Send,
   X,
   ArrowRight,
   Edit,
@@ -25,7 +24,6 @@ import {
   Pause,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { CommentsList } from "@/components/post/comments-list";
 import {
   deletePosts,
@@ -50,7 +48,7 @@ import {
 } from "@/components/ui/sheet";
 import { toast } from "sonner";
 import { createClient as createSupabaseClient } from "@/util/supabase/client";
-import { useRouter } from "next/navigation";
+import { useRouter } from 'nextjs-toploader/app';
 import {
   HoverCard,
   HoverCardContent,
@@ -480,6 +478,7 @@ function DesktopPostDetail({
   );
   const [loadingComments, setLoadingComments] = React.useState(false);
   const [reply, setReply] = React.useState("");
+  const [isReplySubmitting, setIsReplySubmitting] = React.useState(false);
   const attachments = post.attachments ?? [];
   const metaChips = React.useMemo(() => deriveMetaChips(post.meta), [post.meta]);
 
@@ -566,10 +565,12 @@ function DesktopPostDetail({
     }
   };
 
-  const handleSubmitReply = async () => {
-    const text = reply.trim();
+  const handleSubmitReply = async (incoming?: string) => {
+    const source = incoming ?? reply;
+    const text = source.trim();
     if (!text) return;
     setReply("");
+    setIsReplySubmitting(true);
     const optimistic: PostComment = {
       id: `local-${Date.now()}`,
       user: post.user,
@@ -584,7 +585,11 @@ function DesktopPostDetail({
         setComments((c) =>
           (c ?? []).map((cm) => (cm.id === optimistic.id ? created : cm))
         );
-    } catch {}
+    } catch {
+      setReply(source);
+    } finally {
+      setIsReplySubmitting(false);
+    }
   };
 
   if (!open) return null;
@@ -762,21 +767,13 @@ function DesktopPostDetail({
           </div>
 
           <div className="p-6 border-t">
-            <div className="flex gap-2">
-              <Textarea
-                value={reply}
-                onChange={(e) => setReply(e.target.value)}
-                placeholder="Write a reply..."
-                className="min-h-[44px] resize-none"
-              />
-              <Button
-                onClick={handleSubmitReply}
-                disabled={!reply.trim()}
-                size="sm"
-              >
-                <Send className="w-4 h-4" />
-              </Button>
-            </div>
+            <CommentBox
+              value={reply}
+              onChange={setReply}
+              onSubmit={handleSubmitReply}
+              isSubmitting={isReplySubmitting}
+              placeholder="Write a reply..."
+            />
           </div>
         </div>
       </div>

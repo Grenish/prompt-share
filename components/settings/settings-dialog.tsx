@@ -58,6 +58,7 @@ import {
   Frame,
   Gem,
   Star,
+  CakeSlice,
 } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/util/supabase/client";
@@ -348,6 +349,21 @@ const COLOR_PALETTES: ColorPaletteConfig[] = [
       muted: "bg-[#0d1936]",
       background: "bg-[#020819]",
       foreground: "bg-[#e9f3fb]",
+    },
+  },
+  {
+    id: "butterscotch",
+    label: "Butterscotch",
+    description:
+      "Rich, warm tones inspired by the sweetness and comfort of butterscotch, evoking a cozy and inviting atmosphere",
+    icon: CakeSlice,
+    preview: {
+      primary: "bg-[#cc9c42]",
+      secondary: "bg-[#f7f2e3]",
+      accent: "bg-[#f7f2e3]",
+      muted: "bg-[#f7f2e3]",
+      background: "bg-[#fffcf1]",
+      foreground: "bg-[#3f3112]",
     },
   },
 ];

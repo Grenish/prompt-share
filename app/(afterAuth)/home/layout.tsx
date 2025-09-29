@@ -4,6 +4,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { Toaster } from "@/components/ui/sonner";
 import type { Metadata } from "next";
 import BottomNavigation from "@/components/bottom-navigation";
+import NextTopLoader from "nextjs-toploader";
 
 export const metadata: Metadata = {
   title: "AI Cookbook",
@@ -59,6 +60,7 @@ export default async function DashboardLayout({
     <SidebarProvider defaultOpen={defaultOpen} suppressHydrationWarning>
       <AppSidebar />
       <main className="flex-1 w-full min-w-0 mb-20 md:mb-0">
+        <NextTopLoader />
         {children}
         <BottomNavigation />
       </main>
