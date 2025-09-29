@@ -23,7 +23,7 @@ export function SignupForm({
               <div className="flex size-8 items-center justify-center rounded-md">
                 <Book className="size-6" />
               </div>
-              <span className="sr-only">Acme Inc.</span>
+              <span className="sr-only">AI Cookbook</span>
             </a>
             <h1 className="text-xl font-bold">Create an account</h1>
             <div className="text-center text-sm">
@@ -43,6 +43,7 @@ export function SignupForm({
                 placeholder="John Doe"
                 autoComplete="name"
                 required
+                disabled
               />
             </div>
             <div className="grid gap-3">
@@ -53,6 +54,7 @@ export function SignupForm({
                 type="email"
                 placeholder="m@example.com"
                 required
+                disabled
               />
             </div>
             <div className="grid gap-3">
@@ -63,9 +65,15 @@ export function SignupForm({
                 type="password"
                 placeholder="••••••••"
                 required
+                disabled
               />
             </div>
-            <Button type="submit" className="w-full" formAction={signup}>
+            <Button
+              type="submit"
+              className="w-full"
+              // formAction={signup}
+              disabled
+            >
               Sign Up
             </Button>
           </div>
@@ -75,7 +83,7 @@ export function SignupForm({
             </span>
           </div>
           <div className="space-y-4">
-            <Button variant="outline" type="button" className="w-full">
+            <Button variant="outline" type="button" className="w-full" disabled>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="32"
@@ -87,7 +95,7 @@ export function SignupForm({
               </svg>
               Continue with Github
             </Button>
-            <Button variant="outline" type="button" className="w-full">
+            <Button variant="outline" type="button" className="w-full" disabled>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="32"
