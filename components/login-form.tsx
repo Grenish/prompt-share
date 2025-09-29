@@ -31,9 +31,9 @@ export function LoginForm({
               <div className="flex size-8 items-center justify-center rounded-md">
                 <Book className="size-6" />
               </div>
-              <span className="sr-only">Acme Inc.</span>
+              <span className="sr-only">AI Cookbook</span>
             </a>
-            <h1 className="text-xl font-bold">Welcome to Acme Inc.</h1>
+            <h1 className="text-xl font-bold">Welcome to AI Cookbook</h1>
             <div className="text-center text-sm">
               Don&apos;t have an account?{" "}
               <Link href="/signup" className="underline underline-offset-4">
@@ -78,7 +78,7 @@ export function LoginForm({
             </span>
           </div>
           <div className="space-y-4">
-            <Button variant="outline" type="button" className="w-full">
+            <Button variant="outline" type="button" className="w-full" disabled>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="32"
@@ -90,7 +90,7 @@ export function LoginForm({
               </svg>
               Continue with Github
             </Button>
-            <Button variant="outline" type="button" className="w-full">
+            <Button variant="outline" type="button" className="w-full" disabled>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="32"
@@ -106,8 +106,8 @@ export function LoginForm({
         </div>
       </form>
       <div className="text-muted-foreground *:[a]:hover:text-primary text-center text-xs text-balance *:[a]:underline *:[a]:underline-offset-4">
-        By clicking continue, you agree to our <a href="#">Terms of Service</a>{" "}
-        and <a href="#">Privacy Policy</a>.
+        By clicking continue, you agree to our <a href="/terms-and-conditions">Terms and Conditions</a>{" "}
+        and <a href="/privacy-policy">Privacy Policy</a>.
       </div>
     </div>
   );

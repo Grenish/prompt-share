@@ -17,7 +17,7 @@ export const prompts: PromptProp[] = [
     category: "Image",
     subCategory: "Mecha",
     author: "Cookbook",
-    createdAt: new Date(),
+    createdAt: new Date("September 14, 2025"),
     modelName: "Grok Imagine",
   },
   {
@@ -27,7 +27,7 @@ export const prompts: PromptProp[] = [
     category: "Image",
     subCategory: "Animals",
     author: "Cookbook",
-    createdAt: new Date(),
+    createdAt: new Date("September 14, 2025"),
     modelName: "Nano Banana",
   },
   {
@@ -37,7 +37,7 @@ export const prompts: PromptProp[] = [
     category: "Image",
     subCategory: "Dance",
     author: "Cookbook",
-    createdAt: new Date(),
+    createdAt: new Date("September 14, 2025"),
     modelName: "Nano Banana",
   },
   {
@@ -47,7 +47,7 @@ export const prompts: PromptProp[] = [
     category: "Image",
     subCategory: "Robots",
     author: "Cookbook",
-    createdAt: new Date(),
+    createdAt: new Date("September 14, 2025"),
     modelName: "Grok Imagine",
   },
   {
@@ -57,7 +57,7 @@ export const prompts: PromptProp[] = [
     category: "Image",
     subCategory: "Glitch",
     author: "Cookbook",
-    createdAt: new Date(),
+    createdAt: new Date("September 14, 2025"),
     modelName: "Grok Imagine",
   },
   {
@@ -67,7 +67,7 @@ export const prompts: PromptProp[] = [
     category: "Image",
     subCategory: "Animals",
     author: "Cookbook",
-    createdAt: new Date(),
+    createdAt: new Date("September 14, 2025"),
     modelName: "Grok Imagine",
   },
 ];

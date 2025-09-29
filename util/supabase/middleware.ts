@@ -39,7 +39,7 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const publicRoutes = ["/", "/explore", "/community"];
+  const publicRoutes = ["/", "/terms-and-conditions", "/privacy-policy"];
 
   // Public routes that should be accessible without authentication
   const isPublicRoute =
