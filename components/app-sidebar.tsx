@@ -30,7 +30,7 @@ const navItems = [
   { title: "Home", href: `${basePath}`, icon: Home },
   { title: "Profile", href: `${basePath}/profile`, icon: UserIcon },
   { title: "Explore", href: `${basePath}/explore`, icon: Search },
-  { title: "Notifications", href: `${basePath}/notifications`, icon: Bell },
+  // { title: "Notifications", href: `${basePath}/notifications`, icon: Bell },
   { title: "Leaderboard", href: `${basePath}/leaderboard`, icon: Award },
   { title: "Create", href: `${basePath}/create`, icon: PlusCircle },
 ];
