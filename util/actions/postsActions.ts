@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "../supabase/server";
+import { enqueueNotification } from "./notificationsActions";
 import { toStoragePath } from "@/util/storage/helpers";
 
 type ActionBaseResult = {
@@ -400,11 +401,45 @@ export async function togglePostLike(
   }
 
   if (like) {
-    const { error } = await supabase
+    const { error: likeError } = await supabase
       .from("post_likes")
       .insert({ post_id: postId, user_id: user.id });
-    if (error && error.code !== "23505") {
-      return { ok: false, error: error.message };
+
+    if (likeError) {
+      if (likeError.code !== "23505") {
+        return { ok: false, error: likeError.message };
+      }
+    } else {
+      const { data: postOwner, error: postOwnerError } = await supabase
+        .from("posts")
+        .select("author")
+        .eq("id", postId)
+        .maybeSingle();
+
+      if (postOwnerError) {
+        console.error(
+          "Failed to resolve post owner for like notification",
+          postOwnerError
+        );
+      }
+
+      const postAuthorId = (postOwner as any)?.author as string | undefined;
+      if (postAuthorId && postAuthorId !== user.id) {
+        const { ok: notifyOk, error: notifyError } = await enqueueNotification({
+          userId: postAuthorId,
+          actorId: user.id,
+          type: "like",
+          payload: {
+            targetType: "post",
+            targetId: postId,
+            targetUrl: `/home/posts/${postId}`,
+          },
+        });
+
+        if (!notifyOk && notifyError) {
+          console.error("Failed to send like notification", notifyError);
+        }
+      }
     }
   } else {
     const { error } = await supabase
@@ -504,6 +539,39 @@ export async function createPostComment(
 
   const identity = resolveProfileDisplay(profile, user.email);
 
+  const { data: postOwner, error: postOwnerError } = await supabase
+    .from("posts")
+    .select("author")
+    .eq("id", postId)
+    .maybeSingle();
+
+  if (postOwnerError) {
+    console.error(
+      "Failed to resolve post owner for comment notification",
+      postOwnerError
+    );
+  }
+
+  const postAuthorId = (postOwner as any)?.author as string | undefined;
+  if (postAuthorId && postAuthorId !== user.id) {
+    const snippet = body.slice(0, 140);
+    const { ok: notifyOk, error: notifyError } = await enqueueNotification({
+      userId: postAuthorId,
+      actorId: user.id,
+      type: "mention",
+      payload: {
+        targetType: "comment",
+        targetId: String(inserted.id),
+        targetUrl: `/home/posts/${postId}`,
+        snippet,
+      },
+    });
+
+    if (!notifyOk && notifyError) {
+      console.error("Failed to send comment notification", notifyError);
+    }
+  }
+
   const { count: commentsCount } = await supabase
     .from("post_comments")
     .select("id", { count: "exact", head: true })
@@ -550,7 +618,10 @@ export async function getPostComments(
     )
   );
 
-  const profilesMap = new Map<string, ReturnType<typeof resolveProfileDisplay>>();
+  const profilesMap = new Map<
+    string,
+    ReturnType<typeof resolveProfileDisplay>
+  >();
 
   if (userIds.length > 0) {
     const { data: profiles } = await supabase
