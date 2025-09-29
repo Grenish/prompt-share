@@ -106,8 +106,8 @@ export function LoginForm({
         </div>
       </form>
       <div className="text-muted-foreground *:[a]:hover:text-primary text-center text-xs text-balance *:[a]:underline *:[a]:underline-offset-4">
-        By clicking continue, you agree to our <a href="#">Terms of Service</a>{" "}
-        and <a href="#">Privacy Policy</a>.
+        By clicking continue, you agree to our <a href="/terms-and-conditions">Terms and Conditions</a>{" "}
+        and <a href="/privacy-policy">Privacy Policy</a>.
       </div>
     </div>
   );
