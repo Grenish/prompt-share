@@ -188,10 +188,10 @@ export default function Navbar() {
   const showIconsOnly = progress > 0.85 && isDesktop;
 
   const navItems = [
-    { href: "#", label: "Home", icon: Home },
-    { href: "#", label: "Explore", icon: Compass },
-    { href: "#", label: "Create", icon: PenTool },
-    { href: "#", label: "Community", icon: Users },
+    { href: "/", label: "Home", icon: Home },
+    { href: "/home/explore", label: "Explore", icon: Compass },
+    { href: "/home/create", label: "Create", icon: PenTool },
+    // { href: "#", label: "Community", icon: Users },
   ];
 
   const isDark = (mounted ? resolvedTheme : "light") === "dark";
