@@ -1,3 +1,4 @@
+import DisplayPromptBox from "@/components/display-prompt-box";
 import { LoginForm } from "@/components/login-form";
 import { Book } from "lucide-react";
 
@@ -13,9 +14,13 @@ export default function LoginPage() {
       </div>
       <div className="bg-muted relative hidden lg:block">
         <img
-          src="/placeholder.svg"
+          src="/login.png"
           alt="Image"
-          className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+        <DisplayPromptBox
+          prompt="A surreal abstract digital painting of swirling clouds, illuminated with vibrant streaks of orange and soft white, set against a deep dark background. The composition should feel dynamic and atmospheric, with flowing textures and dramatic contrasts, evoking a sense of movement and dreamlike energy."
+          className="absolute p-3 border border-foreground/20 rounded-xl backdrop-blur-sm bg-background/5 bottom-24 left-1/2 transform -translate-x-1/2 "
         />
       </div>
     </div>

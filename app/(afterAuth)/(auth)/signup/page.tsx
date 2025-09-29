@@ -11,7 +11,10 @@ export default function SignupPage() {
           alt="Image"
           className="absolute inset-0 h-full w-full object-cover"
         />
-        <DisplayPromptBox className="absolute p-3 border border-foreground/20 rounded-xl backdrop-blur-sm bg-background/5 bottom-24 left-1/2 transform -translate-x-1/2 " />
+        <DisplayPromptBox
+          prompt="A surreal lone figure stands in a vast barren landscape, gazing upward at ethereal floating letters suspended in the air. The scene feels muted, dreamlike, and otherworldly, with soft desaturated tones and a quiet, abstract atmosphere. Perfect for conceptual, symbolic imagery."
+          className="absolute p-3 border border-foreground/20 rounded-xl backdrop-blur-sm bg-background/5 bottom-24 left-1/2 transform -translate-x-1/2 "
+        />
       </div>
       <div className="flex flex-col gap-4 p-6 md:p-10">
         <div className="flex flex-1 items-center justify-center relative">
