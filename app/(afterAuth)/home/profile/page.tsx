@@ -1,4 +1,4 @@
-import { createClient } from "@/util/supabase/server";
+import { verifySession } from "@/lib/dal";
 import { normalizeUser } from "@/lib/normalizeUser";
 import Image from "next/image";
 import {
@@ -24,12 +24,8 @@ const normalizeString = (value: unknown): string | undefined => {
 };
 
 export default async function DashboardProfilePage() {
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user) {
-    throw new Error("User not authenticated");
-  }
-  const user = normalizeUser(data.user);
+  const { user, supabase } = await verifySession();
+  const normalizedUser = normalizeUser(user);
 
   const [profileInfo, followCounts, aboutMe] = await Promise.all([
     updateUserInfo(),
@@ -43,19 +39,19 @@ export default async function DashboardProfilePage() {
     .select(
       "id, created_at, text, category, category_slug, sub_category, sub_category_slug, model_name, model_label, model_key, model_kind, model_provider, model_provider_slug, media_urls, author"
     )
-    .eq("author", user!.id)
+    .eq("author", normalizedUser!.id)
     .order("created_at", { ascending: false });
 
   const [{ data: savedEntries }, { data: likedEntries }] = await Promise.all([
     supabase
       .from("post_saves")
       .select("post_id, created_at")
-      .eq("user_id", user!.id)
+      .eq("user_id", normalizedUser!.id)
       .order("created_at", { ascending: false }),
     supabase
       .from("post_likes")
       .select("post_id, created_at")
-      .eq("user_id", user!.id)
+      .eq("user_id", normalizedUser!.id)
       .order("created_at", { ascending: false }),
   ]);
 
@@ -142,10 +138,10 @@ export default async function DashboardProfilePage() {
     }
   }
 
-  profilesMap.set(user!.id, {
+  profilesMap.set(normalizedUser!.id, {
     username: profileInfo?.profile?.username ?? null,
-    full_name: user!.displayName ?? null,
-    avatar_url: user!.avatarUrl ?? null,
+    full_name: normalizedUser!.displayName ?? null,
+    avatar_url: normalizedUser!.avatarUrl ?? null,
     bio: profileInfo?.profile?.bio ?? null,
   });
 
@@ -196,12 +192,12 @@ export default async function DashboardProfilePage() {
 
   const mapRowToPost = (row: any): FeedPost => {
     const id = String(row.id);
-    const authorId = row.author ? String(row.author) : user!.id;
+    const authorId = row.author ? String(row.author) : normalizedUser!.id;
     const profile = profilesMap.get(authorId);
     const displayName =
       profile?.full_name ||
       profile?.username ||
-      (authorId === user!.id ? user!.displayName || "You" : "User");
+      (authorId === normalizedUser!.id ? normalizedUser!.displayName || "You" : "User");
 
     return {
       id,
@@ -211,7 +207,7 @@ export default async function DashboardProfilePage() {
         username: profile?.username || undefined,
         avatarUrl:
           profile?.avatar_url ||
-          (authorId === user!.id ? user!.avatarUrl || undefined : undefined),
+          (authorId === normalizedUser!.id ? normalizedUser!.avatarUrl || undefined : undefined),
         bio: profile?.bio || undefined,
       },
       createdAt: row.created_at ?? new Date().toISOString(),
@@ -295,16 +291,16 @@ export default async function DashboardProfilePage() {
               <div className="relative flex-shrink-0">
                 <Avatar className="w-[100px] h-[100px] sm:w-[120px] sm:h-[120px] md:w-[150px] md:h-[150px] border border-border bg-background">
                   <AvatarImage
-                    src={user?.avatarUrl || undefined}
+                    src={normalizedUser?.avatarUrl || undefined}
                     alt={`${
-                      user?.displayName ||
+                      normalizedUser?.displayName ||
                       profileInfo?.profile?.username ||
                       "User"
                     } avatar`}
                   />
                   <AvatarFallback className="bg-muted text-foreground text-lg sm:text-xl md:text-2xl font-medium">
                     {initialsFrom(
-                      user?.displayName,
+                      normalizedUser?.displayName,
                       profileInfo?.profile?.username
                     )}
                   </AvatarFallback>
@@ -318,7 +314,7 @@ export default async function DashboardProfilePage() {
                 <div className="flex flex-col sm:flex-row items-center sm:items-start sm:justify-between gap-3">
                   <div>
                     <h1 className="text-xl sm:text-2xl font-semibold text-foreground">
-                      {user?.displayName || "Unknown User"}
+                      {normalizedUser?.displayName || "Unknown User"}
                     </h1>
                     <p className="text-sm sm:text-base text-muted-foreground">
                       @{profileInfo?.profile?.username || "username"}
@@ -386,7 +382,7 @@ export default async function DashboardProfilePage() {
                 <PostFeed
                   posts={posts}
                   className="max-w-2xl mx-auto"
-                  currentUserId={user!.id}
+                  currentUserId={normalizedUser!.id}
                 />
               ) : (
                 <div className="mx-auto text-sm flex flex-col items-center justify-center text-muted-foreground pointer-events-none select-none">
@@ -431,7 +427,7 @@ export default async function DashboardProfilePage() {
                 <PostFeed
                   posts={savedPosts}
                   className="max-w-2xl mx-auto"
-                  currentUserId={user!.id}
+                  currentUserId={normalizedUser!.id}
                 />
               ) : (
                 <div className="mx-auto text-sm flex flex-col items-center justify-center text-muted-foreground pointer-events-none select-none">
@@ -460,7 +456,7 @@ export default async function DashboardProfilePage() {
                 <PostFeed
                   posts={likedPosts}
                   className="max-w-2xl mx-auto"
-                  currentUserId={user!.id}
+                  currentUserId={normalizedUser!.id}
                 />
               ) : (
                 <div className="mx-auto text-sm flex flex-col items-center justify-center text-muted-foreground pointer-events-none select-none">
