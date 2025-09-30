@@ -4,24 +4,20 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "../supabase/server";
 import { AuthSchema, EmailSchema, PasswordSchema } from "@/lib/types";
+import { LoginSchema, SignupSchema } from "@/lib/validation";
 import { z } from "zod";
 
 export async function login(formData: FormData) {
   const supabase = await createClient();
 
-  // Validate only email + password for login
-  const LoginSchema = z.object({
-    email: EmailSchema,
-    password: PasswordSchema,
-  });
-
+  // Validate using centralized schema
   const parseResult = LoginSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
   });
 
   if (!parseResult.success) {
-    // Optionally, store errors in search params or a cookie/flash store
+    console.error("Login validation failed:", parseResult.error.flatten());
     return redirect("/error");
   }
 
@@ -33,7 +29,7 @@ export async function login(formData: FormData) {
   });
 
   if (error) {
-    console.log("Login error:", error);
+    console.error("Login error:", error);
     redirect("/error");
   }
 
@@ -49,23 +45,20 @@ export type LoginState = {
 export async function loginAction(_prev: LoginState, formData: FormData): Promise<LoginState> {
   const supabase = await createClient();
 
-  const LoginSchema = z.object({
-    email: EmailSchema,
-    password: PasswordSchema,
-  });
-
   const parsed = LoginSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
   });
+  
   if (!parsed.success) {
     return { ok: false, error: "Please enter a valid email and an 8+ char password." };
   }
 
   const { email, password } = parsed.data;
   const { error } = await supabase.auth.signInWithPassword({ email, password });
+  
   if (error) {
-    console.log("Login error:", error);
+    console.error("Login error:", error);
     return { ok: false, error: "Invalid email or password." };
   }
 
@@ -76,14 +69,15 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
 export async function signup(formData: FormData) {
   const supabase = await createClient();
 
-  // Validate email, password, and name
-  const parseResult = AuthSchema.safeParse({
+  // Validate using centralized schema
+  const parseResult = SignupSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
     name: formData.get("name"),
   });
 
   if (!parseResult.success) {
+    console.error("Signup validation failed:", parseResult.error.flatten());
     return redirect("/error");
   }
 
@@ -100,6 +94,7 @@ export async function signup(formData: FormData) {
   });
 
   if (error) {
+    console.error("Signup error:", error);
     return redirect("/error");
   }
 
