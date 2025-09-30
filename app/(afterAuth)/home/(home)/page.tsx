@@ -1,5 +1,4 @@
-import { createClient } from "@/util/supabase/server";
-import { redirect } from "next/navigation";
+import { verifySession } from "@/lib/dal";
 import { normalizeUser } from "@/lib/normalizeUser";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { PostFeed, type Post as FeedPost } from "@/components/post-feed";
@@ -12,16 +11,10 @@ const normalizeString = (value: unknown): string | undefined => {
 };
 
 export default async function DashboardHomePage() {
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.getUser();
-
-  if (error || !data.user) {
-    redirect("/login");
-  }
-
-  const user = normalizeUser(data.user);
-  const viewerId = user?.id;
-  const viewerDisplayName = user?.displayName;
+  const { user, supabase } = await verifySession();
+  const normalizedUser = normalizeUser(user);
+  const viewerId = normalizedUser?.id;
+  const viewerDisplayName = normalizedUser?.displayName;
 
   const { data: followingRows } = await supabase
     .from("follows")
@@ -249,10 +242,10 @@ export default async function DashboardHomePage() {
           <div className="text-lg font-semibold">Cookbook</div>
           <div className="text-sm text-muted-foreground truncate max-w-[180px]">
             <UserButton
-              userId={user?.id}
-              name={user?.displayName || ""}
-              email={user?.email || ""}
-              imageSrc={user?.avatarUrl ?? null}
+              userId={normalizedUser?.id}
+              name={normalizedUser?.displayName || ""}
+              email={normalizedUser?.email || ""}
+              imageSrc={normalizedUser?.avatarUrl ?? null}
               size="icon"
               className="md:hidden"
             />
