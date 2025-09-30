@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
-import { GoogleAnalytics } from "@next/third-parties/google";
-import ClarityInit from "@/components/ClarityInit";
+import Script from 'next/script'
 
 export const metadata: Metadata = {
   title: "AI Cookbook",
@@ -60,8 +59,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           {children}
-          <ClarityInit />
-          <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_ID!} />
+          <Script src="https://scripts.simpleanalyticscdn.com/latest.js"  />
         </ThemeProvider>
       </body>
     </html>
