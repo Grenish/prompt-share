@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
-import { GoogleAnalytics } from "@next/third-parties/google";
-import ClarityInit from "@/components/ClarityInit";
+import AnalyticsProvider from "@/components/AnalyticsProvider";
+import { createClient } from "@/util/supabase/server";
+import { normalizeUser } from "@/lib/normalizeUser";
 
 export const metadata: Metadata = {
   title: "AI Cookbook",
@@ -45,11 +46,16 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Get user data for analytics identification
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const normalizedUser = user ? normalizeUser(user) : null;
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="font-sans antialiased">
@@ -60,8 +66,18 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           {children}
-          <ClarityInit />
-          <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_ID!} />
+          <AnalyticsProvider
+            userId={normalizedUser?.id}
+            userProperties={
+              normalizedUser
+                ? {
+                    username: normalizedUser.displayName || undefined,
+                    email: normalizedUser.email || undefined,
+                    signupDate: user?.created_at || undefined,
+                  }
+                : undefined
+            }
+          />
         </ThemeProvider>
       </body>
     </html>
