@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
-import Script from 'next/script'
+import Script from "next/script";
 
 export const metadata: Metadata = {
   title: "AI Cookbook",
@@ -59,9 +59,9 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           {children}
-          <Script src="https://scripts.simpleanalyticscdn.com/latest.js"  />
         </ThemeProvider>
       </body>
+      <Script src="https://scripts.simpleanalyticscdn.com/latest.js" />
     </html>
   );
 }
