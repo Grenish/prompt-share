@@ -19,7 +19,7 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { UserButton } from "@/components/userButton";
-import { createClient } from "@/util/supabase/server";
+import { verifySession } from "@/lib/dal";
 import { normalizeUser } from "@/lib/normalizeUser";
 import SidebarMenuButtonTrigger from "./sidebar-menu-button";
 import Link from "next/link";
@@ -36,12 +36,8 @@ const navItems = [
 ];
 
 export async function AppSidebar() {
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user) {
-    throw new Error("User not authenticated");
-  }
-  const user = normalizeUser(data.user);
+  const { user } = await verifySession();
+  const normalizedUser = normalizeUser(user);
 
   return (
     <Sidebar
@@ -94,10 +90,10 @@ export async function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <UserButton
-              userId={user?.id}
-              name={user?.displayName || ""}
-              email={user?.email || ""}
-              imageSrc={user?.avatarUrl ?? null}
+              userId={normalizedUser?.id}
+              name={normalizedUser?.displayName || ""}
+              email={normalizedUser?.email || ""}
+              imageSrc={normalizedUser?.avatarUrl ?? null}
             />
           </SidebarMenuItem>
         </SidebarMenu>
