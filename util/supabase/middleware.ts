@@ -15,61 +15,103 @@ export async function updateSession(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
+          cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
           supabaseResponse = NextResponse.next({
             request,
           });
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
+            supabaseResponse.cookies.set(name, value, {
+              ...options,
+              httpOnly: true,
+              secure: process.env.NODE_ENV === 'production',
+              sameSite: 'lax',
+              path: '/',
+            })
           );
         },
       },
     }
   );
 
-  // Do not run code between createServerClient and
+  // CRITICAL: Do not run code between createServerClient and
   // supabase.auth.getUser(). A simple mistake could make it very hard to debug
   // issues with users being randomly logged out.
 
-  // IMPORTANT: DO NOT REMOVE auth.getUser()
-
+  // IMPORTANT: DO NOT REMOVE auth.getUser() - it refreshes the session
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const publicRoutes = ["/", "/terms-and-conditions", "/privacy-policy", "/waitlist"];
+  // Define public routes that don't require authentication
+  const publicRoutes = [
+    "/", 
+    "/terms-and-conditions", 
+    "/privacy-policy", 
+    "/waitlist"
+  ];
 
-  // Public routes that should be accessible without authentication
+  const pathname = request.nextUrl.pathname;
+
+  // Check if route is public
   const isPublicRoute =
-    publicRoutes.includes(request.nextUrl.pathname) ||
-    request.nextUrl.pathname.startsWith("/login") ||
-    request.nextUrl.pathname.startsWith("/signup") ||
-    request.nextUrl.pathname.startsWith("/auth") ||
-    request.nextUrl.pathname.startsWith("/error");
+    publicRoutes.includes(pathname) ||
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/signup") ||
+    pathname.startsWith("/auth") ||
+    pathname.startsWith("/error");
 
+  // Redirect unauthenticated users trying to access protected routes
   if (!user && !isPublicRoute) {
-    // no user, potentially respond by redirecting the user to the login page
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    return NextResponse.redirect(url);
+    // Preserve the original destination for redirect after login
+    url.searchParams.set("redirect", pathname);
+    
+    const response = NextResponse.redirect(url);
+    // Preserve Supabase session cookies
+    supabaseResponse.cookies.getAll().forEach((cookie) => {
+      response.cookies.set(cookie.name, cookie.value, {
+        path: '/',
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+      });
+    });
+    return response;
   }
 
-  // If user is authenticated and hits root, redirect to dashboard
-  if (user && request.nextUrl.pathname === "/") {
+  // Redirect authenticated users from root to home
+  if (user && pathname === "/") {
     const url = request.nextUrl.clone();
     url.pathname = "/home";
     const redirectResponse = NextResponse.redirect(url);
-    // Copy over any cookies set by Supabase (preserve session cookies)
+    
+    // Preserve all session cookies
     supabaseResponse.cookies.getAll().forEach((cookie) => {
       redirectResponse.cookies.set(cookie.name, cookie.value, {
-        path: cookie.path,
-        httpOnly: cookie.httpOnly,
-        sameSite: cookie.sameSite as any,
-        secure: cookie.secure,
-        expires: cookie.expires,
-        maxAge: cookie.maxAge,
+        path: '/',
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+      });
+    });
+    return redirectResponse;
+  }
+
+  // Redirect authenticated users away from auth pages
+  if (user && (pathname.startsWith("/login") || pathname.startsWith("/signup"))) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/home";
+    const redirectResponse = NextResponse.redirect(url);
+    
+    supabaseResponse.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie.name, cookie.value, {
+        path: '/',
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
       });
     });
     return redirectResponse;
