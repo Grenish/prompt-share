@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "../supabase/server";
+import { verifySession } from "@/lib/dal";
+import { PostCreateSchema, PostCommentSchema } from "@/lib/validation";
 import { enqueueNotification } from "./notificationsActions";
 import { toStoragePath } from "@/util/storage/helpers";
 
@@ -98,21 +100,28 @@ const toNullable = (value: string) => {
 export async function postAction(
   input: PostActionInput
 ): Promise<PostActionResult> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return { ok: false, error: "Not authenticated" };
-  }
+  // Use DAL for authentication
+  const { user, supabase } = await verifySession();
 
   const bucket = "postsBucket";
 
   try {
-    // Validate
+    // Validate input using centralized schema
+    const validation = PostCreateSchema.safeParse({
+      text: input.text,
+      category: input.category,
+      subCategory: input.subCategory,
+      modelName: input.modelName,
+      tags: input.tags,
+    });
+
+    if (!validation.success) {
+      return { 
+        ok: false, 
+        error: validation.error.issues[0]?.message || "Invalid input" 
+      };
+    }
+
     const text = (input.text || "").trim();
     if (!text && !(input.files && input.files.length)) {
       return { ok: false, error: "Post must include text or media" };
@@ -298,24 +307,26 @@ export async function postAction(
 }
 
 export async function deletePosts(postId: string): Promise<PostActionResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-  if (userError || !user) return { ok: false, error: "Not authenticated" };
+  // Use DAL for authentication
+  const { user, supabase } = await verifySession();
 
   const bucket = "postsBucket";
 
+  // Authorization check: verify user owns the post
   const { data: post, error: postError } = await supabase
     .from("posts")
-    .select("media_urls")
+    .select("media_urls, author")
     .eq("id", postId)
-    .eq("author", user.id)
     .single();
 
-  if (postError || !post)
+  if (postError || !post) {
     return { ok: false, error: postError?.message || "Post not found" };
+  }
+
+  // Ensure user owns the post
+  if ((post as any).author !== user.id) {
+    return { ok: false, error: "Unauthorized: You can only delete your own posts" };
+  }
 
   // toStoragePath imported from shared util/storage/helpers
 
@@ -386,15 +397,8 @@ export async function togglePostLike(
   postId: string,
   like: boolean
 ): Promise<TogglePostLikeResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return { ok: false, error: "Not authenticated" };
-  }
+  // Use DAL for authentication
+  const { user, supabase } = await verifySession();
 
   if (!postId) {
     return { ok: false, error: "Invalid post id" };
@@ -464,15 +468,8 @@ export async function togglePostSave(
   postId: string,
   save: boolean
 ): Promise<TogglePostSaveResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return { ok: false, error: "Not authenticated" };
-  }
+  // Use DAL for authentication
+  const { user, supabase } = await verifySession();
 
   if (!postId) {
     return { ok: false, error: "Invalid post id" };
@@ -503,23 +500,24 @@ export async function createPostComment(
   postId: string,
   text: string
 ): Promise<CreatePostCommentResult> {
-  const body = (text || "").trim();
+  // Validate input using centralized schema
+  const validation = PostCommentSchema.safeParse({ text });
+  
+  if (!validation.success) {
+    return { 
+      ok: false, 
+      error: validation.error.issues[0]?.message || "Invalid comment" 
+    };
+  }
+
+  const body = validation.data.text;
+
   if (!postId) {
     return { ok: false, error: "Invalid post id" };
   }
-  if (!body) {
-    return { ok: false, error: "Comment cannot be empty" };
-  }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return { ok: false, error: "Not authenticated" };
-  }
+  // Use DAL for authentication
+  const { user, supabase } = await verifySession();
 
   const { data: inserted, error } = await supabase
     .from("post_comments")
