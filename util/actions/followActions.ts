@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "../supabase/server";
+import { verifySession } from "@/lib/dal";
 import { revalidatePath } from "next/cache";
 import { enqueueNotification } from "./notificationsActions";
 
@@ -41,16 +42,11 @@ export async function toggleFollow(
   _prev: FollowActionState,
   formData: FormData
 ): Promise<FollowActionState> {
-  const supabase = await createClient();
+  // Use DAL for authentication
+  const { user, supabase } = await verifySession();
+  
   const targetUserId = String(formData.get("targetUserId") || "");
 
-  const {
-    data: { user },
-    error: userErr,
-  } = await supabase.auth.getUser();
-  if (userErr || !user) {
-    return { ok: false, following: false, error: "Not authenticated" };
-  }
   if (!targetUserId || targetUserId === user.id) {
     // ignore self follow
     const { followers } = await getFollowStateFor(targetUserId || user.id);
