@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "../supabase/server";
+import { verifySession } from "@/lib/dal";
+import { ProfileUpdateSchema } from "@/lib/validation";
 import { toStoragePath } from "@/util/storage/helpers";
 
 export type UpdateProfileAvatarState = {
@@ -17,17 +19,9 @@ export async function updateProfileAvatar(
   _prevState: UpdateProfileAvatarState,
   formData: FormData
 ): Promise<UpdateProfileAvatarState> {
-  const supabase = await createClient();
+  // Use DAL for authentication
+  const { user, supabase } = await verifySession();
   const warnings: string[] = [];
-
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return { ok: false, error: "Not authenticated" };
-  }
 
   try {
     const remove = formData.get("remove");
@@ -205,16 +199,8 @@ export type UserInfoResult = {
 export async function updateUserInfo(
   _formData?: FormData
 ): Promise<UserInfoResult> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return { ok: false, error: "Not authenticated" };
-  }
+  // Use DAL for authentication
+  const { user, supabase } = await verifySession();
 
   //  get the data like bio, background image and username from the supabase table named "profiles"
   const { data: profileRow, error: profileError } = await supabase
@@ -245,16 +231,8 @@ export type FollowsResult = {
 };
 
 export async function fetchFollows(): Promise<FollowsResult> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return { ok: false, error: "Not authenticated" };
-  }
+  // Use DAL for authentication
+  const { user, supabase } = await verifySession();
 
   //  get the count of followers and following from the supabase table named "follows"
   // Assumes a schema with columns follower_id (the one who follows) and following_id (the one being followed)
@@ -308,16 +286,9 @@ export async function updateProfileSettings(
   _prev: UpdateProfileSettingsState,
   formData: FormData
 ): Promise<UpdateProfileSettingsState> {
-  const supabase = await createClient();
+  // Use DAL for authentication
+  const { user, supabase } = await verifySession();
   const warnings: string[] = [];
-
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-  if (userError || !user) {
-    return { ok: false, error: "Not authenticated" };
-  }
 
   try {
     // Fetch previous background URL before changing
@@ -365,9 +336,16 @@ export async function updateProfileSettings(
       newBackgroundUrl = publicData.publicUrl;
     }
 
-    // Build update payload
+    // Build update payload with validation
     const updatePayload: Record<string, any> = {};
-    if (bio !== undefined) updatePayload.bio = bio || null;
+    if (bio !== undefined) {
+      // Validate bio length
+      const validation = ProfileUpdateSchema.partial().safeParse({ bio });
+      if (!validation.success) {
+        return { ok: false, error: "Bio is too long (max 500 characters)" };
+      }
+      updatePayload.bio = bio || null;
+    }
     if (newBackgroundUrl !== undefined)
       updatePayload.background_image = newBackgroundUrl;
 
@@ -446,16 +424,8 @@ export type AboutMeResult = {
  * Fetch the current user's About content from the `abouts` table.
  */
 export async function fetchAboutMe(): Promise<AboutMeResult> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return { ok: false, error: "Not authenticated" };
-  }
+  // Use DAL for authentication
+  const { user, supabase } = await verifySession();
 
   const { data, error } = await supabase
     .from("abouts")
@@ -477,16 +447,8 @@ export async function fetchAboutMe(): Promise<AboutMeResult> {
 export async function updateAboutMe(
   input: string | FormData
 ): Promise<AboutMeResult> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return { ok: false, error: "Not authenticated" };
-  }
+  // Use DAL for authentication
+  const { user, supabase } = await verifySession();
 
   const newContent =
     typeof input === "string"
@@ -494,6 +456,11 @@ export async function updateAboutMe(
       : typeof input.get("content") === "string"
       ? String(input.get("content"))
       : "";
+
+  // Validate content length
+  if (newContent.length > 5000) {
+    return { ok: false, error: "About content is too long (max 5000 characters)" };
+  }
 
   try {
     const { data: existing, error: fetchErr } = await supabase
