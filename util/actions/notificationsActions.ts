@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "../supabase/server";
+import { verifySession } from "@/lib/dal";
 import { getAdminClient } from "../supabase/admin";
 import type {
   NotificationsResult,
@@ -26,15 +27,8 @@ export async function markNotificationReadAction(
     return { ok: false, error: "Invalid notification identifier" };
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return { ok: false, error: "Not authenticated" };
-  }
+  // Use DAL for authentication
+  const { user, supabase } = await verifySession();
 
   const { error } = await supabase
     .from("notifications")
@@ -57,15 +51,8 @@ export async function markAllNotificationsReadAction(): Promise<{
   error?: string;
   updated?: number;
 }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return { ok: false, error: "Not authenticated" };
-  }
+  // Use DAL for authentication
+  const { user, supabase } = await verifySession();
 
   const { data, error } = await supabase
     .from("notifications")
@@ -88,15 +75,8 @@ export async function fetchUnreadNotificationsCount(): Promise<{
   count?: number;
   error?: string;
 }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return { ok: false, error: "Not authenticated" };
-  }
+  // Use DAL for authentication
+  const { user, supabase } = await verifySession();
 
   const { count, error } = await supabase
     .from("notifications")
