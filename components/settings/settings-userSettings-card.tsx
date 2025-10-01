@@ -1,3 +1,5 @@
+"use client";
+
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -12,6 +14,11 @@ import {
   DialogClose,
 } from "../ui/dialog";
 import { SectionHeader } from "./section-header";
+import { useActionState, useEffect, useRef } from "react";
+import {
+  changePasswordAction,
+  type ChangePasswordState,
+} from "@/util/actions/authActions";
 
 function Card({
   title,
@@ -34,6 +41,18 @@ function Card({
 }
 
 export default function UserSettingsCard() {
+  const [state, formAction, pending] = useActionState<
+    ChangePasswordState,
+    FormData
+  >(changePasswordAction, { ok: false });
+  const formRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    if (state?.ok) {
+      formRef.current?.reset();
+    }
+  }, [state]);
+
   return (
     <>
       <section className="space-y-6">
@@ -60,44 +79,78 @@ export default function UserSettingsCard() {
                       Keep your account secure by using a strong password.
                     </DialogDescription>
                   </DialogHeader>
+                  <form
+                    ref={formRef}
+                    action={formAction}
+                    className="grid gap-6"
+                  >
+                    <div className="grid gap-4 py-2">
+                      <div className="grid gap-2">
+                        <Label htmlFor="current-password">
+                          Current password
+                        </Label>
+                        <Input
+                          id="current-password"
+                          name="currentPassword"
+                          type="password"
+                          placeholder="••••••••"
+                          autoComplete="current-password"
+                          required
+                          disabled={pending}
+                        />
+                      </div>
 
-                  <div className="grid gap-4 py-2">
-                    <div className="grid gap-2">
-                      <Label htmlFor="current-password">Current password</Label>
-                      <Input
-                        id="current-password"
-                        type="password"
-                        placeholder="••••••••"
-                      />
+                      <div className="grid gap-2">
+                        <Label htmlFor="new-password">New password</Label>
+                        <Input
+                          id="new-password"
+                          name="newPassword"
+                          type="password"
+                          placeholder="At least 8 characters"
+                          autoComplete="new-password"
+                          required
+                          disabled={pending}
+                        />
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Label htmlFor="confirm-password">
+                          Confirm new password
+                        </Label>
+                        <Input
+                          id="confirm-password"
+                          name="confirmPassword"
+                          type="password"
+                          placeholder="Re-enter new password"
+                          autoComplete="new-password"
+                          required
+                          disabled={pending}
+                        />
+                      </div>
                     </div>
 
-                    <div className="grid gap-2">
-                      <Label htmlFor="new-password">New password</Label>
-                      <Input
-                        id="new-password"
-                        type="password"
-                        placeholder="At least 8 characters"
-                      />
-                    </div>
+                    {state?.error ? (
+                      <p className="text-sm text-destructive" role="alert">
+                        {state.error}
+                      </p>
+                    ) : null}
+                    {state?.ok && state?.message ? (
+                      <p className="text-sm text-emerald-600" role="status">
+                        {state.message}
+                      </p>
+                    ) : null}
 
-                    <div className="grid gap-2">
-                      <Label htmlFor="confirm-password">
-                        Confirm new password
-                      </Label>
-                      <Input
-                        id="confirm-password"
-                        type="password"
-                        placeholder="Re-enter new password"
-                      />
-                    </div>
-                  </div>
-
-                  <DialogFooter>
-                    <DialogClose asChild>
-                      <Button variant="outline">Cancel</Button>
-                    </DialogClose>
-                    <Button>Save changes</Button>
-                  </DialogFooter>
+                    <DialogFooter>
+                      <DialogClose asChild>
+                        <Button type="button" variant="outline" disabled={pending}>
+                          Cancel
+                        </Button>
+                      </DialogClose>
+                      <Button type="submit" disabled={pending}>
+                        {pending ? "Saving…" : "Save changes"}
+                      </Button>
+                    </DialogFooter>
+                  </form>
                 </DialogContent>
               </Dialog>
             }
