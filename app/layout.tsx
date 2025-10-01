@@ -65,14 +65,11 @@ export default function RootLayout({
           strategy="afterInteractive"
           data-hostname="aicookbook.work"
         />
-        <noscript>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="https://queue.simpleanalyticscdn.com/noscript.gif"
-            alt=""
-            referrerPolicy="no-referrer-when-downgrade"
-          />
-        </noscript>
+        <Script
+          defer
+          src="https://cloud.umami.is/script.js"
+          data-website-id="f10bc64a-84b2-4ecb-8394-901e5972750a"
+        />
       </body>
     </html>
   );
