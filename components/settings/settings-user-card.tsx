@@ -333,7 +333,7 @@ export default function SettingsUserCard() {
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
             This action is irreversible. Please make sure you've exported any
-            important data before continuing.
+            important data before continuing. (Coming Soon)
           </CardContent>
           <CardFooter className="flex justify-end">
             <AlertDialog
@@ -344,7 +344,7 @@ export default function SettingsUserCard() {
               }}
             >
               <AlertDialogTrigger asChild>
-                <Button variant="destructive">Delete account</Button>
+                <Button variant="destructive" disabled>Delete account</Button>
               </AlertDialogTrigger>
               <AlertDialogContent className="sm:max-w-md">
                 <AlertDialogHeader>
