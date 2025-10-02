@@ -1,4 +1,3 @@
-// mdx-components.tsx
 import type { MDXComponents } from "mdx/types";
 import Link from "next/link";
 import Image from "next/image";
@@ -41,16 +40,16 @@ function Heading(level: 1 | 2 | 3 | 4 | 5 | 6) {
 
     const base =
       level === 1
-        ? "mt-2 scroll-mt-28 text-4xl font-bold tracking-tight text-gray-900 dark:text-gray-100"
+        ? "mt-2 scroll-mt-28 text-4xl font-bold tracking-tight leading-tight text-gray-900 dark:text-gray-50"
         : level === 2
-        ? "mt-10 scroll-mt-28 border-b border-gray-200 dark:border-gray-800 pb-2 text-3xl font-semibold tracking-tight text-gray-900 dark:text-gray-100 first:mt-0"
+        ? "mt-12 scroll-mt-28 border-b border-gray-200 dark:border-gray-800 pb-3 text-3xl font-semibold tracking-tight leading-tight text-gray-900 dark:text-gray-50 first:mt-0"
         : level === 3
-        ? "mt-8 scroll-mt-28 text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100"
+        ? "mt-10 scroll-mt-28 text-2xl font-semibold tracking-tight leading-snug text-gray-900 dark:text-gray-100"
         : level === 4
-        ? "mt-8 scroll-mt-28 text-xl font-semibold tracking-tight text-gray-900 dark:text-gray-100"
+        ? "mt-8 scroll-mt-28 text-xl font-semibold tracking-tight leading-snug text-gray-900 dark:text-gray-100"
         : level === 5
-        ? "mt-8 scroll-mt-28 text-lg font-semibold tracking-tight text-gray-900 dark:text-gray-100"
-        : "mt-8 scroll-mt-28 text-base font-semibold tracking-tight text-gray-900 dark:text-gray-100";
+        ? "mt-8 scroll-mt-28 text-lg font-semibold tracking-tight leading-snug text-gray-900 dark:text-gray-100"
+        : "mt-8 scroll-mt-28 text-base font-semibold tracking-tight leading-snug text-gray-900 dark:text-gray-100";
 
     return (
       <Tag id={anchor} className={cn(base, className)} {...props}>
@@ -60,7 +59,7 @@ function Heading(level: 1 | 2 | 3 | 4 | 5 | 6) {
           aria-label={text}
         >
           {children}
-          <span className="ml-2 text-gray-300 transition-opacity group-hover:opacity-100 opacity-0 dark:text-gray-600">
+          <span className="ml-2 text-gray-400 transition-all duration-200 group-hover:opacity-100 opacity-0 dark:text-gray-500">
             #
           </span>
         </a>
@@ -81,7 +80,7 @@ function A({
     href.startsWith("tel:");
 
   const base =
-    "font-medium text-blue-600 underline underline-offset-4 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300";
+    "font-medium text-blue-600 underline decoration-blue-600/30 underline-offset-4 transition-all duration-200 hover:text-blue-700 hover:decoration-blue-700/50 dark:text-blue-400 dark:decoration-blue-400/30 dark:hover:text-blue-300 dark:hover:decoration-blue-300/50";
 
   if (!href) {
     return (
@@ -119,7 +118,7 @@ function P({
   return (
     <p
       className={cn(
-        "leading-7 text-gray-700 dark:text-gray-300 [&:not(:first-child)]:mt-6",
+        "leading-relaxed text-base text-gray-700 dark:text-gray-300 [&:not(:first-child)]:mt-6",
         className
       )}
       {...props}
@@ -129,18 +128,32 @@ function P({
 
 function Ul(props: React.HTMLAttributes<HTMLUListElement>) {
   return (
-    <ul className={cn("my-6 ml-6 list-disc", props.className)} {...props} />
+    <ul
+      className={cn("my-6 ml-6 list-disc space-y-2", props.className)}
+      {...props}
+    />
   );
 }
 
 function Ol(props: React.HTMLAttributes<HTMLOListElement>) {
   return (
-    <ol className={cn("my-6 ml-6 list-decimal", props.className)} {...props} />
+    <ol
+      className={cn("my-6 ml-6 list-decimal space-y-2", props.className)}
+      {...props}
+    />
   );
 }
 
 function Li(props: React.LiHTMLAttributes<HTMLLIElement>) {
-  return <li className={cn("mt-2", props.className)} {...props} />;
+  return (
+    <li
+      className={cn(
+        "leading-relaxed text-gray-700 dark:text-gray-300",
+        props.className
+      )}
+      {...props}
+    />
+  );
 }
 
 function Blockquote({
@@ -150,7 +163,7 @@ function Blockquote({
   return (
     <blockquote
       className={cn(
-        "mt-6 border-l-4 border-gray-200 dark:border-gray-800 pl-6 italic text-gray-600 dark:text-gray-400",
+        "mt-6 border-l-4 border-blue-500/20 dark:border-blue-400/20 bg-blue-50/50 dark:bg-blue-900/10 pl-6 pr-4 py-4 italic text-gray-700 dark:text-gray-400 rounded-r-lg",
         className
       )}
       {...props}
@@ -162,7 +175,7 @@ function Hr(props: React.HTMLAttributes<HTMLHRElement>) {
   return (
     <hr
       className={cn(
-        "my-8 border-gray-200 dark:border-gray-800",
+        "my-10 border-gray-200 dark:border-gray-800",
         props.className
       )}
       {...props}
@@ -176,7 +189,7 @@ function Code({ className, ...props }: React.HTMLAttributes<HTMLElement>) {
     return (
       <code
         className={cn(
-          "relative rounded bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 font-mono text-sm text-gray-800 dark:text-gray-100",
+          "relative rounded-md bg-gray-100 dark:bg-gray-800 px-1.5 py-1 font-mono text-[0.875em] text-gray-800 dark:text-gray-200",
           className
         )}
         {...props}
@@ -190,7 +203,7 @@ function Pre({ className, ...props }: React.HTMLAttributes<HTMLPreElement>) {
   return (
     <pre
       className={cn(
-        "my-6 overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/40 p-4",
+        "my-8 overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/60 p-5 shadow-sm",
         className
       )}
       {...props}
@@ -202,11 +215,17 @@ function Table({
   className,
   ...props
 }: React.TableHTMLAttributes<HTMLTableElement>) {
+  // Wrapper provides border, radius, shadow and horizontal scrolling
   return (
-    <div className="my-6 w-full overflow-x-auto">
+    <div className="my-8 w-full overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
       <table
-        className={cn("w-full caption-bottom text-sm", className)}
         {...props}
+        className={cn(
+          // separate + spacing-0 lets us round header corners cleanly
+          "w-full border-separate border-spacing-0 table-auto",
+          "text-sm leading-6",
+          className
+        )}
       />
     </div>
   );
@@ -215,27 +234,40 @@ function Table({
 function THead(props: React.HTMLAttributes<HTMLTableSectionElement>) {
   return (
     <thead
+      {...props}
       className={cn(
-        "border-b border-gray-200 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-900/30",
+        // distinct header background
+        "bg-gray-50 dark:bg-gray-900/50",
         props.className
       )}
-      {...props}
     />
   );
 }
 
 function TBody(props: React.HTMLAttributes<HTMLTableSectionElement>) {
-  return <tbody className={props.className} {...props} />;
+  return (
+    <tbody
+      {...props}
+      className={cn(
+        // zebra stripes only for body rows
+        "odd:[&_tr]:bg-white even:[&_tr]:bg-gray-50/60 dark:odd:[&_tr]:bg-transparent dark:even:[&_tr]:bg-gray-900/30",
+        props.className
+      )}
+    />
+  );
 }
 
 function Tr(props: React.HTMLAttributes<HTMLTableRowElement>) {
   return (
     <tr
+      {...props}
       className={cn(
-        "border-b border-gray-100 dark:border-gray-900/40 transition-colors hover:bg-gray-50 dark:hover:bg-gray-900/40",
+        // subtle hover across rows
+        "transition-colors duration-150 hover:bg-gray-50 dark:hover:bg-gray-900/40",
+        // row dividers (bottom border)
+        "border-b border-gray-200 dark:border-gray-800 last:border-0",
         props.className
       )}
-      {...props}
     />
   );
 }
@@ -243,21 +275,72 @@ function Tr(props: React.HTMLAttributes<HTMLTableRowElement>) {
 function Th(props: React.ThHTMLAttributes<HTMLTableCellElement>) {
   return (
     <th
+      {...props}
       className={cn(
-        "h-10 px-4 text-left align-middle font-medium text-gray-900 dark:text-gray-100",
+        // spacing
+        "px-6 py-3",
+        // alignment/typography
+        "text-left text-xs font-semibold uppercase tracking-wide",
+        "text-gray-700 dark:text-gray-300",
+        // header bottom border
+        "border-b border-gray-200 dark:border-gray-800",
+        // rounded header corners (first/last th)
+        "first:rounded-tl-xl last:rounded-tr-xl",
+        // keep header above body on scroll inside container
+        "sticky top-0 z-10",
+        // ensure sticky header keeps its background
+        "bg-gray-50 dark:bg-gray-900/50",
+        // prevent awkward wrapping for short headers
+        "whitespace-nowrap",
         props.className
       )}
-      {...props}
+      scope={props.scope ?? "col"}
     />
   );
 }
 
 function Td(props: React.TdHTMLAttributes<HTMLTableCellElement>) {
-  return <td className={cn("p-4 align-middle", props.className)} {...props} />;
+  return (
+    <td
+      {...props}
+      className={cn(
+        // spacing
+        "px-6 py-4",
+        // content alignment and typography
+        "align-top text-gray-700 dark:text-gray-300",
+        // wrap long content nicely
+        "whitespace-normal break-words",
+        // subtle row borders
+        "border-b border-gray-200 dark:border-gray-800 last:border-0",
+        props.className
+      )}
+    />
+  );
+}
+
+// Optional: if you use <caption>, this styles it nicely
+function Caption(props: React.HTMLAttributes<HTMLTableCaptionElement>) {
+  return (
+    <caption
+      {...props}
+      className={cn(
+        "caption-bottom mt-3 text-sm text-gray-500 dark:text-gray-400",
+        props.className
+      )}
+    />
+  );
 }
 
 function Strong(props: React.HTMLAttributes<HTMLElement>) {
-  return <strong className={cn("font-semibold", props.className)} {...props} />;
+  return (
+    <strong
+      className={cn(
+        "font-semibold text-gray-900 dark:text-gray-100",
+        props.className
+      )}
+      {...props}
+    />
+  );
 }
 
 function Em(props: React.HTMLAttributes<HTMLElement>) {
@@ -268,7 +351,7 @@ function Kbd(props: React.HTMLAttributes<HTMLElement>) {
   return (
     <kbd
       className={cn(
-        "rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-1.5 py-0.5 font-mono text-xs shadow-sm text-gray-700 dark:text-gray-200",
+        "inline-flex items-center rounded-md border border-gray-300 dark:border-gray-600 bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 px-2 py-1 font-mono text-xs font-medium shadow-sm text-gray-800 dark:text-gray-200",
         props.className
       )}
       {...props}
@@ -280,7 +363,7 @@ function Details(props: React.DetailsHTMLAttributes<HTMLDetailsElement>) {
   return (
     <details
       className={cn(
-        "my-6 rounded-lg border border-gray-200 dark:border-gray-800 p-4 open:bg-gray-50 dark:open:bg-gray-900/30",
+        "my-6 rounded-xl border border-gray-200 dark:border-gray-800 p-5 transition-all duration-200 open:bg-gray-50 dark:open:bg-gray-900/30 open:shadow-sm",
         props.className
       )}
       {...props}
@@ -293,7 +376,7 @@ function Summary(props: React.HTMLAttributes<HTMLElement>) {
   return (
     <summary
       className={cn(
-        "cursor-pointer font-medium text-gray-900 dark:text-gray-100",
+        "cursor-pointer font-medium text-gray-900 dark:text-gray-100 hover:text-gray-700 dark:hover:text-gray-300 transition-colors duration-200 select-none",
         props.className
       )}
       {...props}
@@ -314,7 +397,7 @@ function Img(props: React.ImgHTMLAttributes<HTMLImageElement>) {
         width={w}
         height={h}
         className={cn(
-          "my-6 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/30",
+          "my-8 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/30 shadow-sm",
           className
         )}
         {...(rest as any)}
@@ -330,7 +413,7 @@ function Img(props: React.ImgHTMLAttributes<HTMLImageElement>) {
       alt={alt}
       loading="lazy"
       className={cn(
-        "my-6 max-w-full rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/30",
+        "my-8 max-w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/30 shadow-sm",
         className
       )}
       {...rest}
@@ -374,6 +457,7 @@ const baseComponents: MDXComponents = {
   tr: Tr,
   th: Th,
   td: Td,
+  caption: Caption,
 
   // Extras
   kbd: Kbd,
