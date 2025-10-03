@@ -39,6 +39,8 @@ import {
   X,
   Upload,
   Trash2,
+  Pencil,
+  Images,
 } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/util/supabase/client";
@@ -48,6 +50,14 @@ import SettingsUserCard from "./settings-user-card";
 import UserSettingsCard from "./settings-userSettings-card";
 import { SettingsAppearanceCard } from "./settings-appearance-card";
 import SettingsNotificationCard from "./settings-notifications-card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export type SettingsDialogProps = {
   name: string;
@@ -137,6 +147,11 @@ export function SettingsDialog({
   );
   const [avatarOptionsOpen, setAvatarOptionsOpen] = React.useState(false);
 
+  // UI-only state
+  const [editingName, setEditingName] = React.useState(false);
+  const [editingEmail, setEditingEmail] = React.useState(false);
+  const [avatarGalleryOpen, setAvatarGalleryOpen] = React.useState(false);
+
   React.useEffect(() => {
     return () => {
       if (tempImageUrl?.startsWith("blob:")) URL.revokeObjectURL(tempImageUrl);
@@ -151,6 +166,7 @@ export function SettingsDialog({
   const isSaving = (section: Section) => savingSection === section;
 
   const avatarInputId = React.useId();
+  const avatarInputRef = React.useRef<HTMLInputElement>(null);
 
   const onAvatarFile = (file?: File | null) => {
     if (!file) return;
@@ -158,6 +174,8 @@ export function SettingsDialog({
     const url = URL.createObjectURL(file);
     setTempImageUrl(url);
     setCropperOpen(true);
+    // Reset input value so same file can be selected again
+    if (avatarInputRef.current) avatarInputRef.current.value = "";
   };
 
   const handleCropComplete = (croppedUrl: string, file: File) => {
@@ -228,6 +246,16 @@ export function SettingsDialog({
 
   return (
     <>
+      {/* Single file input for avatar upload, used by both desktop and mobile */}
+      <input
+        id={avatarInputId}
+        ref={avatarInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => onAvatarFile(e.target.files?.[0])}
+      />
+
       <DialogContent
         className={cn(
           "p-0 overflow-hidden bg-background",
@@ -237,6 +265,12 @@ export function SettingsDialog({
           "sm:w-[900px] sm:max-w-[900px] sm:h-[640px] sm:rounded-xl sm:border"
         )}
       >
+        <DialogHeader className="sr-only">
+          <DialogTitle>Settings</DialogTitle>
+          <DialogDescription>
+            Manage your account preferences.
+          </DialogDescription>
+        </DialogHeader>
         <div className="flex h-full flex-col">
           {/* Mobile Header with Back Navigation */}
           <div className="md:hidden sticky top-0 z-30 border-b bg-background">
@@ -349,88 +383,248 @@ export function SettingsDialog({
                       description="Update your personal information"
                     />
 
-                    {/* Mobile-optimized Avatar Section */}
-                    <div className="flex flex-col items-center sm:flex-row sm:items-start gap-4">
-                      <button
-                        onClick={() => isMobile && setAvatarOptionsOpen(true)}
-                        className="relative group cursor-pointer"
-                      >
-                        <Avatar className="h-24 w-24 sm:h-16 sm:w-16 ring-2 ring-border">
-                          {effectiveImage && (
-                            <AvatarImage
-                              src={effectiveImage}
-                              alt={trimmedName || "User"}
-                              onError={() => setImgError(true)}
-                            />
-                          )}
-                          <AvatarFallback className="text-2xl sm:text-lg">
-                            {initials}
-                          </AvatarFallback>
-                        </Avatar>
-                        {isMobile && (
-                          <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Camera className="h-6 w-6 text-white" />
-                          </div>
-                        )}
-                      </button>
-
-                      {/* Desktop Avatar Actions */}
-                      {!isMobile && (
-                        <div className="space-x-2">
-                          <input
-                            id={avatarInputId}
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) => onAvatarFile(e.target.files?.[0])}
-                          />
-                          <Button
-                            variant="secondary"
-                            onClick={() =>
-                              document.getElementById(avatarInputId)?.click()
-                            }
-                          >
-                            Upload new
-                          </Button>
-                          {effectiveImage && (
-                            <Button
-                              variant="ghost"
-                              onClick={() => {
-                                setLocalAvatar(null);
-                                setImgError(false);
-                                setAvatarFile(null);
-                                setAvatarRemoved(true);
-                                toast("Avatar removed");
-                              }}
+                    <div className="grid gap-6">
+                      {/* Avatar card */}
+                      <div className="rounded-xl border bg-card text-card-foreground p-6">
+                        <div className="flex flex-col items-center text-center gap-4">
+                          {/* Desktop: dropdown on click. Mobile: open bottom sheet. */}
+                          {isMobile ? (
+                            <button
+                              type="button"
+                              aria-label="Edit avatar"
+                              onClick={() => setAvatarOptionsOpen(true)}
+                              className="group relative block rounded-full outline-none"
                             >
-                              Remove
-                            </Button>
+                              <Avatar className="h-28 w-28 sm:h-32 sm:w-32 ring-2 ring-border shadow-sm transition-transform group-active:scale-95">
+                                {effectiveImage && (
+                                  <AvatarImage
+                                    src={effectiveImage}
+                                    alt={trimmedName || "User"}
+                                    onError={() => setImgError(true)}
+                                  />
+                                )}
+                                <AvatarFallback className="text-2xl">
+                                  {initials}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-black/35 opacity-0 transition-opacity group-hover:opacity-100">
+                                <span className="inline-flex items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white">
+                                  <Pencil className="h-3.5 w-3.5" />
+                                  Edit
+                                </span>
+                              </div>
+                            </button>
+                          ) : (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button
+                                  type="button"
+                                  aria-label="Avatar actions"
+                                  className="group relative block rounded-full outline-none"
+                                >
+                                  <Avatar className="h-28 w-28 sm:h-32 sm:w-32 ring-2 ring-border shadow-sm transition-transform group-active:scale-95">
+                                    {effectiveImage && (
+                                      <AvatarImage
+                                        src={effectiveImage}
+                                        alt={trimmedName || "User"}
+                                        onError={() => setImgError(true)}
+                                      />
+                                    )}
+                                    <AvatarFallback className="text-2xl">
+                                      {initials}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-black/35 opacity-0 transition-opacity group-hover:opacity-100">
+                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white">
+                                      <Pencil className="h-3.5 w-3.5" />
+                                      Edit photo
+                                    </span>
+                                  </div>
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent
+                                align="center"
+                                className="w-48"
+                              >
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    avatarInputRef.current?.click();
+                                  }}
+                                >
+                                  <Upload className="mr-2 h-4 w-4" />
+                                  Upload photo
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => setAvatarGalleryOpen(true)}
+                                >
+                                  <Images className="mr-2 h-4 w-4" />
+                                  Browse avatars
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  disabled={!effectiveImage}
+                                  className="text-destructive focus:text-destructive"
+                                  onClick={() => {
+                                    setLocalAvatar(null);
+                                    setImgError(false);
+                                    setAvatarFile(null);
+                                    setAvatarRemoved(true);
+                                    toast("Avatar removed");
+                                  }}
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Remove photo
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           )}
+
+                          <p className="text-sm text-muted-foreground">
+                            Recommended 256×256+; JPG, PNG, or WebP. Cropped to
+                            a circle.
+                          </p>
                         </div>
-                      )}
+                      </div>
+
+                      {/* Info card */}
+                      <div className="rounded-xl border bg-card text-card-foreground p-6">
+                        <div className="grid gap-5 sm:grid-cols-2">
+                          {/* Name */}
+                          <div className="grid gap-2">
+                            <div className="flex items-center justify-between">
+                              <Label htmlFor="name">Display name</Label>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 px-2 gap-1.5"
+                                onClick={() => {
+                                  setEditingName((v) => !v);
+                                  if (!editingName) {
+                                    setTimeout(
+                                      () => nameRef.current?.focus(),
+                                      0
+                                    );
+                                  }
+                                }}
+                              >
+                                {editingName ? (
+                                  <>
+                                    <Check className="h-4 w-4" />
+                                    Done
+                                  </>
+                                ) : (
+                                  <>
+                                    <Pencil className="h-4 w-4" />
+                                    Edit
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                            <Input
+                              id="name"
+                              defaultValue={trimmedName}
+                              ref={nameRef}
+                              disabled={!editingName}
+                              className="h-11 sm:h-10 text-sm disabled:opacity-100 disabled:bg-muted/50"
+                              aria-describedby="name-hint"
+                            />
+                            <p
+                              id="name-hint"
+                              className="text-xs text-muted-foreground"
+                            >
+                              This is your public name. Use Save to apply
+                              changes.
+                            </p>
+                          </div>
+
+                          {/* Email */}
+                          <div className="grid gap-2">
+                            <div className="flex items-center justify-between">
+                              <Label htmlFor="email">Email</Label>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 px-2 gap-1.5"
+                                onClick={() => {
+                                  setEditingEmail((v) => !v);
+                                  if (!editingEmail) {
+                                    setTimeout(
+                                      () => emailRef.current?.focus(),
+                                      0
+                                    );
+                                  }
+                                }}
+                              >
+                                {editingEmail ? (
+                                  <>
+                                    <Check className="h-4 w-4" />
+                                    Done
+                                  </>
+                                ) : (
+                                  <>
+                                    <Pencil className="h-4 w-4" />
+                                    Edit
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                            <Input
+                              id="email"
+                              defaultValue={email}
+                              type="email"
+                              ref={emailRef}
+                              disabled={!editingEmail}
+                              className="h-11 sm:h-10 text-sm disabled:opacity-100 disabled:bg-muted/50"
+                              aria-describedby="email-hint"
+                            />
+                            <p
+                              id="email-hint"
+                              className="text-xs text-muted-foreground"
+                            >
+                              Changing your email may require re‑verification.
+                              Remember to Save.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="grid gap-4">
-                      <div className="grid gap-2">
-                        <Label htmlFor="name">Name</Label>
-                        <Input
-                          id="name"
-                          defaultValue={trimmedName}
-                          ref={nameRef}
-                          className="h-12 text-base sm:h-10 sm:text-sm"
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="email">Email</Label>
-                        <Input
-                          id="email"
-                          defaultValue={email}
-                          type="email"
-                          ref={emailRef}
-                          className="h-12 text-base sm:h-10 sm:text-sm"
-                        />
-                      </div>
-                    </div>
+                    {/* Browse avatars dialog (skeleton only) */}
+                    <Dialog
+                      open={avatarGalleryOpen}
+                      onOpenChange={setAvatarGalleryOpen}
+                    >
+                      <DialogContent className="sm:max-w-[560px]">
+                        <DialogHeader>
+                          <DialogTitle>Choose an avatar</DialogTitle>
+                          <DialogDescription>
+                            Pick from our preset gallery.
+                          </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 max-h-[60vh] overflow-auto pt-2">
+                          {Array.from({ length: 18 }).map((_, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              className="group relative aspect-square rounded-full ring-1 ring-border hover:ring-primary/60 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                              disabled
+                            >
+                              <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-full bg-muted">
+                                <Skeleton className="h-full w-full rounded-full" />
+                              </div>
+                              <span className="sr-only">Avatar {i + 1}</span>
+                            </button>
+                          ))}
+                        </div>
+
+                        <p className="text-xs text-muted-foreground pt-2">
+                          Preset avatars coming soon.
+                        </p>
+                      </DialogContent>
+                    </Dialog>
                   </section>
                 )}
 
@@ -502,18 +696,11 @@ export function SettingsDialog({
             <SheetDescription>Choose an option</SheetDescription>
           </SheetHeader>
           <div className="grid gap-2 py-4">
-            <input
-              id={avatarInputId}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => onAvatarFile(e.target.files?.[0])}
-            />
             <Button
               variant="outline"
               className="justify-start"
               onClick={() => {
-                document.getElementById(avatarInputId)?.click();
+                avatarInputRef.current?.click();
               }}
             >
               <Upload className="mr-2 h-4 w-4" />
@@ -571,7 +758,6 @@ export function SettingsDialog({
   );
 }
 
-// Mobile-optimized cropper
 function MobileFriendlyCropper({
   open,
   onOpenChange,
@@ -591,6 +777,12 @@ function MobileFriendlyCropper({
   );
   const [isProcessing, setIsProcessing] = React.useState(false);
 
+  const reset = () => {
+    setCrop({ x: 0, y: 0 });
+    setZoom(1);
+    setRotation(0);
+  };
+
   const handleSave = async () => {
     if (!croppedAreaPixels) return;
     setIsProcessing(true);
@@ -602,89 +794,124 @@ function MobileFriendlyCropper({
       );
       onCropComplete(url, file);
       onOpenChange(false);
-    } catch (error) {
+    } catch {
       toast.error("Failed to process image");
     } finally {
       setIsProcessing(false);
     }
   };
 
+  // Reset state when dialog closes
+  React.useEffect(() => {
+    if (!open) reset();
+  }, [open]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="p-0 w-screen h-[100svh] max-h-[100svh] rounded-none">
-        {/* Header */}
-        <div className="sticky top-0 z-30 flex items-center justify-between p-4 border-b bg-background">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onOpenChange(false)}
-          >
-            <X className="h-5 w-5" />
-          </Button>
-          <span className="font-semibold">Crop Image</span>
-          <Button size="sm" onClick={handleSave} disabled={isProcessing}>
-            {isProcessing ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              "Done"
-            )}
-          </Button>
-        </div>
+      <DialogContent
+        className="
+          p-0 overflow-hidden
+          w-[min(100vw,640px)] sm:max-w-[640px]
+          max-h-[90svh]
+          rounded-none sm:rounded-xl
+        "
+      >
+        <DialogHeader className="sr-only">
+          <DialogTitle>Crop Image</DialogTitle>
+          <DialogDescription>
+            Adjust your new avatar before saving.
+          </DialogDescription>
+        </DialogHeader>
 
-        {/* Cropper */}
-        <div className="relative flex-1 bg-black">
-          <Cropper
-            image={imageUrl}
-            crop={crop}
-            zoom={zoom}
-            rotation={rotation}
-            aspect={1}
-            cropShape="round"
-            onCropChange={setCrop}
-            onZoomChange={setZoom}
-            onRotationChange={setRotation}
-            onCropComplete={(_, pixels) => setCroppedAreaPixels(pixels)}
-            showGrid={false}
-          />
-        </div>
-
-        {/* Controls */}
-        <div className="sticky bottom-0 z-30 border-t bg-background p-4 space-y-4">
-          <div className="flex items-center gap-4">
-            <ZoomOut className="h-4 w-4 text-muted-foreground" />
-            <Slider
-              value={[zoom]}
-              onValueChange={([v]) => setZoom(v)}
-              min={1}
-              max={3}
-              step={0.01}
-              className="flex-1"
-            />
-            <ZoomIn className="h-4 w-4 text-muted-foreground" />
+        <div className="flex max-h-[90svh] flex-col">
+          {/* Header */}
+          <div className="shrink-0 sticky top-0 z-30 flex items-center justify-between p-4 border-b bg-background">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onOpenChange(false)}
+            >
+              <X className="h-5 w-5" />
+            </Button>
+            <span className="font-semibold">Crop Image</span>
+            <Button size="sm" onClick={handleSave} disabled={isProcessing}>
+              {isProcessing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Done"
+              )}
+            </Button>
           </div>
 
-          <div className="flex justify-center gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setRotation((r) => r - 90)}
-            >
-              <RotateCw className="h-4 w-4 rotate-180" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setRotation(0)}
-            >
-              <Maximize className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setRotation((r) => r + 90)}
-            >
-              <RotateCw className="h-4 w-4" />
-            </Button>
+          <div
+            className="
+              relative w-full bg-black
+              h-[min(60svh,420px)] sm:h-[360px]
+            "
+          >
+            <Cropper
+              image={imageUrl}
+              crop={crop}
+              zoom={zoom}
+              rotation={rotation}
+              aspect={1}
+              cropShape="round"
+              onCropChange={setCrop}
+              onZoomChange={(z) => setZoom(z)}
+              onRotationChange={setRotation}
+              onCropComplete={(_, pixels) => setCroppedAreaPixels(pixels)}
+              showGrid={false}
+              zoomWithScroll
+              restrictPosition
+            />
+          </div>
+
+          {/* Controls */}
+          <div className="shrink-0 sticky bottom-0 z-30 border-t bg-background p-4 space-y-4">
+            <div className="flex items-center gap-4">
+              <ZoomOut className="h-4 w-4 text-muted-foreground" />
+              <Slider
+                value={[zoom]}
+                onValueChange={([v]) => setZoom(v)}
+                min={1}
+                max={3}
+                step={0.01}
+                className="flex-1"
+                aria-label="Zoom"
+              />
+              <ZoomIn className="h-4 w-4 text-muted-foreground" />
+            </div>
+
+            <div className="flex items-center justify-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setRotation((r) => r - 90)}
+                aria-label="Rotate left"
+              >
+                <RotateCw className="h-4 w-4 rotate-180" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setRotation(0)}
+                aria-label="Reset rotation"
+              >
+                <Maximize className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setRotation((r) => r + 90)}
+                aria-label="Rotate right"
+              >
+                <RotateCw className="h-4 w-4" />
+              </Button>
+              <div className="mx-2 h-4 w-px bg-border" />
+              <Button variant="ghost" size="sm" onClick={reset}>
+                Reset
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>
@@ -692,102 +919,112 @@ function MobileFriendlyCropper({
   );
 }
 
-// Utility Components
-function Card({
-  title,
-  description,
-  action,
-}: {
-  title: string;
-  description: string;
-  action?: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-center justify-between rounded-lg border p-4">
-      <div className="space-y-0.5">
-        <div className="text-sm font-medium">{title}</div>
-        <div className="text-xs text-muted-foreground">{description}</div>
-      </div>
-      {action}
-    </div>
-  );
+function getRadianAngle(deg: number) {
+  return (deg * Math.PI) / 180;
 }
 
-// Image processing utilities
+function rotateSize(width: number, height: number, rotation: number) {
+  const rotRad = getRadianAngle(rotation);
+  return {
+    width:
+      Math.abs(Math.cos(rotRad) * width) + Math.abs(Math.sin(rotRad) * height),
+    height:
+      Math.abs(Math.sin(rotRad) * width) + Math.abs(Math.cos(rotRad) * height),
+  };
+}
+
 async function getCroppedImg(
   imageSrc: string,
   pixelCrop: Area,
-  rotation = 0
+  rotation = 0,
+  opts?: {
+    maxSize?: number; // longest side in px
+    quality?: number; // 0..1
+    mimeType?: "image/webp" | "image/png" | "image/jpeg";
+    circleMask?: boolean; // optional: output round image
+  }
 ): Promise<{ file: File; url: string }> {
   const image = await createImage(imageSrc);
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("No 2d context");
 
-  const maxSize = 384;
+  const maxSize = opts?.maxSize ?? 384;
+  const quality = opts?.quality ?? 0.9;
+  const mimeType = opts?.mimeType ?? "image/webp";
+
+  const { width: bW, height: bH } = rotateSize(
+    image.width,
+    image.height,
+    rotation
+  );
+  const tmpCanvas = document.createElement("canvas");
+  tmpCanvas.width = Math.max(1, Math.round(bW));
+  tmpCanvas.height = Math.max(1, Math.round(bH));
+  const tctx = tmpCanvas.getContext("2d", { willReadFrequently: true });
+  if (!tctx) throw new Error("No 2d context");
+
+  tctx.imageSmoothingEnabled = true;
+  tctx.imageSmoothingQuality = "high";
+
+  tctx.translate(tmpCanvas.width / 2, tmpCanvas.height / 2);
+  tctx.rotate(getRadianAngle(rotation));
+  tctx.translate(-image.width / 2, -image.height / 2);
+  tctx.drawImage(image, 0, 0);
+
   const scale = Math.min(
     1,
     maxSize / Math.max(pixelCrop.width, pixelCrop.height)
   );
+  const outW = Math.max(1, Math.round(pixelCrop.width * scale));
+  const outH = Math.max(1, Math.round(pixelCrop.height * scale));
 
-  canvas.width = pixelCrop.width * scale;
-  canvas.height = pixelCrop.height * scale;
+  const outCanvas = document.createElement("canvas");
+  outCanvas.width = outW;
+  outCanvas.height = outH;
+  const octx = outCanvas.getContext("2d");
+  if (!octx) throw new Error("No 2d context");
 
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
+  octx.imageSmoothingEnabled = true;
+  octx.imageSmoothingQuality = "high";
 
-  if (rotation) {
-    const rotRad = (rotation * Math.PI) / 180;
-    const sin = Math.abs(Math.sin(rotRad));
-    const cos = Math.abs(Math.cos(rotRad));
-    const newWidth = pixelCrop.width * cos + pixelCrop.height * sin;
-    const newHeight = pixelCrop.width * sin + pixelCrop.height * cos;
-
-    canvas.width = newWidth * scale;
-    canvas.height = newHeight * scale;
-
-    ctx.translate(canvas.width / 2, canvas.height / 2);
-    ctx.rotate(rotRad);
-    ctx.translate(
-      (-pixelCrop.width * scale) / 2,
-      (-pixelCrop.height * scale) / 2
-    );
-  }
-
-  ctx.drawImage(
-    image,
+  octx.drawImage(
+    tmpCanvas,
     pixelCrop.x,
     pixelCrop.y,
     pixelCrop.width,
     pixelCrop.height,
     0,
     0,
-    pixelCrop.width * scale,
-    pixelCrop.height * scale
+    outW,
+    outH
   );
 
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => {
-        if (!blob) {
-          reject(new Error("Canvas is empty"));
-          return;
-        }
-        const file = new File([blob], "avatar.webp", { type: "image/webp" });
-        const url = URL.createObjectURL(blob);
-        resolve({ file, url });
-      },
-      "image/webp",
-      0.85
+  if (opts?.circleMask) {
+    octx.globalCompositeOperation = "destination-in";
+    octx.beginPath();
+    octx.arc(outW / 2, outH / 2, Math.min(outW, outH) / 2, 0, Math.PI * 2);
+    octx.closePath();
+    octx.fill();
+  }
+
+  const blob: Blob = await new Promise((resolve, reject) => {
+    outCanvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error("Canvas is empty"))),
+      mimeType,
+      quality
     );
   });
+
+  const file = new File([blob], "avatar.webp", { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  return { file, url };
 }
 
 function createImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
-    image.addEventListener("load", () => resolve(image));
-    image.addEventListener("error", (error) => reject(error));
+    image.crossOrigin = "anonymous";
+    image.decoding = "async";
+    image.onload = () => resolve(image);
+    image.onerror = (event: Event | string) => reject(event);
     image.src = url;
   });
 }
