@@ -43,7 +43,6 @@ export function SignupForm({
                 placeholder="John Doe"
                 autoComplete="name"
                 required
-                disabled
               />
             </div>
             <div className="grid gap-3">
@@ -54,7 +53,6 @@ export function SignupForm({
                 type="email"
                 placeholder="m@example.com"
                 required
-                disabled
               />
             </div>
             <div className="grid gap-3">
@@ -65,15 +63,9 @@ export function SignupForm({
                 type="password"
                 placeholder="••••••••"
                 required
-                disabled
               />
             </div>
-            <Button
-              type="submit"
-              className="w-full"
-              // formAction={signup}
-              disabled
-            >
+            <Button type="submit" className="w-full" formAction={signup}>
               Sign Up
             </Button>
           </div>
@@ -83,7 +75,7 @@ export function SignupForm({
             </span>
           </div>
           <div className="space-y-4">
-            <Button variant="outline" type="button" className="w-full" disabled>
+            <Button variant="outline" type="button" className="w-full">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="32"
@@ -95,7 +87,7 @@ export function SignupForm({
               </svg>
               Continue with Github
             </Button>
-            <Button variant="outline" type="button" className="w-full" disabled>
+            <Button variant="outline" type="button" className="w-full">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="32"
