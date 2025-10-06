@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     title: "AI Cookbook",
     description:
       "Browse, share, and discover curated AI prompts for ChatGPT, Gemini, MidJourney, and other AI tools. Unlock new ways to boost creativity and productivity.",
-    url: "http://localhost:3000",
+    url: "https://aicookbook.vercel.app/",
     siteName: "AI Cookbook",
     images: [
       {
