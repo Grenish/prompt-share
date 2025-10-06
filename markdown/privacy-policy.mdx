@@ -2,7 +2,7 @@
 
 **Effective Date:** October 5, 2025
 
-**Last Modified:** October 2, 2025
+**Last Modified:** October 6, 2025
 
 ### Introduction
 
@@ -19,7 +19,7 @@ We architected AI Cookbook from the ground up with data privacy as a core princi
 - **Purpose-Limited Communication:** We will only contact you for essential account-related matters, such as security alerts, password recovery, or significant updates to our Platform or policies. We do not send marketing or promotional emails.
 - **Data Sovereignty:** Your generated content remains your own. We will never use your prompts or generated media to train third-party AI models.
 - **Privacy-Centric Analytics:** We utilize cookieless, privacy-first analytics to understand usage trends without compromising individual user privacy.
-- **Transparent Infrastructure:** We are fully transparent about the technologies and sub-processors we use to deliver the service, as detailed in Section 4.
+- **Transparent Infrastructure:** We are fully transparent about the technologies and sub-processors we use to deliver the service, as detailed in Section 6.
 
 ### 1. Information We Collect and Process
 
@@ -53,16 +53,15 @@ We utilize **Simple Analytics** and **Umami** for website analytics. These are p
 
 Our legal basis for collecting and using the personal information described above will depend on the personal information concerned and the specific context in which we collect it. For users in jurisdictions such as the European Union (under GDPR), our processing activities are based on the following:
 
-| Purpose of Processing                      | Data Categories Involved                      | Legal Basis (GDPR)                                                           |
-| :----------------------------------------- | :-------------------------------------------- | :--------------------------------------------------------------------------- |
-| **Service Provision & Account Management** | Account Information, Profile Information, UGC | **Contractual Necessity** (to fulfill our Terms of Service)                  |
-| **Authentication & Authorization**         | Email, Hashed Password, OAuth Tokens          | **Contractual Necessity**                                                    |
-| **Content Storage & Retrieval**            | User-Generated Content                        | **Contractual Necessity**                                                    |
-| **Security & Fraud Prevention**            | Log Data, IP Address (transient)              | **Legitimate Interest** (to protect our Platform and users)                  |
-| **Platform Improvement & Optimization**    | Anonymized Analytics Data                     | **Legitimate Interest** (to improve our service offering)                    |
-| **Essential Service Communications**       | Email Address                                 | **Legitimate Interest** (to inform you of critical security/service updates) |
-| **OAuth Sign-In**                          | Name, Email, Profile Picture (from provider)  | **Consent** (you explicitly choose to use this sign-in method)               |
-
+| Purpose of Processing                       | Data Categories Involved                       | Legal Basis (GDPR)                                                            |
+| :------------------------------------------ | :--------------------------------------------- | :---------------------------------------------------------------------------- |
+| **Service Provision & Account Management**  | Account Information, Profile Information, UGC  | **Contractual Necessity** (to fulfill our Terms of Service)                   |
+| **Authentication & Authorization**          | Email, Hashed Password, OAuth Tokens           | **Contractual Necessity**                                                     |
+| **Content Storage & Retrieval**             | User-Generated Content                         | **Contractual Necessity**                                                     |
+| **Security & Fraud Prevention**             | Log Data, IP Address (transient)               | **Legitimate Interest** (to protect our Platform and users)                   |
+| **Platform Improvement & Optimization**     | Anonymized Analytics Data                      | **Legitimate Interest** (to improve our service offering)                     |
+| **Essential Service Communications**        | Email Address                                  | **Legitimate Interest** (to inform you of critical security/service updates)  |
+| **OAuth Sign-In**                           | Name, Email, Profile Picture (from provider)   | **Consent** (you explicitly choose to use this sign-in method)                |
 
 ### 3. Data Storage, Security, and Technology Infrastructure
 
@@ -77,7 +76,7 @@ We are transparent about our technology stack to provide you with a clear unders
   - **Encryption in Transit:** All data transmitted between your client and our servers is encrypted using **HTTPS/TLS 1.2** or higher.
   - **Encryption at Rest:** Data stored within Supabase's infrastructure is encrypted at rest.
   - **Access Control:** We enforce strict access controls on our database. We utilize **PostgreSQL Row-Level Security (RLS)** to ensure that a user can only query and access their own data. All file access requests are validated server-side via Next.js Server Actions against RLS policies, preventing unauthorized access even if a direct file URL is known.
-- **Email Delivery:** Transactional emails (e.g., password resets) are sent via **Gmail's SMTP server**. Only the necessary information (recipient email and message content) is processed for delivery.
+- **Email Delivery:** Transactional emails (e.g., password resets, account verification) are sent via **Maileroo**, a transactional email delivery service. Only the necessary information (recipient email and message content) is processed for this purpose. **Please note:** There is a possibility that emails from our service may be categorized as spam by your email provider. We recommend checking your spam or junk folder and adding our email address to your contacts to ensure reliable delivery.
 
 ### 4. Data Retention Policy
 
@@ -109,7 +108,7 @@ We rely on a limited number of trusted third-party services to operate the Platf
 - **Google & GitHub** (USA): OAuth Authentication Providers
 - **Simple Analytics** (Netherlands): Privacy-First Analytics
 - **Umami** (USA): Privacy-First Analytics
-- **Google (Gmail SMTP)** (USA): Email Delivery
+- **Maileroo** (India): Email Delivery
 
 ### 7. International Data Transfers
 
@@ -121,7 +120,7 @@ Our Platform is not intended for or directed at children under the age of 13 (or
 
 ### 9. Changes to This Privacy Policy
 
-We reserve the right to modify this Privacy Policy at any time. If we make material changes, we will notify you by updating the "Effective Date" at the top of this policy and may provide additional notice as appropriate under the circumstances. Your continued use of the Platform after any modification constitutes your acceptance of the revised Policy.
+We reserve the right to modify this Privacy Policy at any time. If we make material changes, we will notify you by updating the "Last Modified" date at the top of this policy and may provide additional notice as appropriate under the circumstances. Your continued use of the Platform after any modification constitutes your acceptance of the revised Policy.
 
 ### 10. Contact Information
 
