@@ -6,66 +6,114 @@ import { createClient } from "../supabase/server";
 import { AuthSchema, EmailSchema, PasswordSchema } from "@/lib/types";
 import { z } from "zod";
 
-export async function login(formData: FormData) {
-  const supabase = await createClient();
+// Schemas (module scope)
+const LoginSchema = z.object({
+  email: EmailSchema,
+  password: PasswordSchema,
+});
 
-  // Validate only email + password for login
-  const LoginSchema = z.object({
-    email: EmailSchema,
-    password: PasswordSchema,
+const SignupSchema = AuthSchema;
+
+const ChangePasswordSchema = z.object({
+  currentPassword: PasswordSchema,
+  newPassword: PasswordSchema,
+  confirmPassword: PasswordSchema,
+});
+
+// Helpers
+function redirectWithToast(
+  path: string,
+  toastKey: string,
+  extras: Record<string, string | undefined> = {}
+): never {
+  const usp = new URLSearchParams({ toast: toastKey, ...extras });
+  const sep = path.includes("?") ? "&" : "?";
+  redirect(`${path}${sep}${usp.toString()}`);
+}
+
+type ActionState =
+  | { ok: true; message?: string | null }
+  | { ok: false; error: string | null };
+
+async function doLogin(email: string, password: string): Promise<ActionState> {
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) {
+    console.error("Login error:", error);
+    return { ok: false, error: "Invalid email or password." };
+  }
+  return { ok: true, message: null };
+}
+
+async function doSignup(
+  email: string,
+  password: string,
+  name: string
+): Promise<ActionState> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: { display_name: name },
+    },
   });
 
-  const parseResult = LoginSchema.safeParse({
+  if (error) {
+    return { ok: false, error: error.message || "Failed to create account." };
+  }
+
+  // If email confirmations are enabled in Supabase, session will be null.
+  const requiresEmailConfirm = !data.session;
+  return requiresEmailConfirm
+    ? { ok: true, message: "verify_email" }
+    : { ok: true, message: "signup_success" };
+}
+
+// Actions (for <form action={...}> usage)
+
+export async function login(formData: FormData) {
+  const parsed = LoginSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
   });
 
-  if (!parseResult.success) {
-    // Optionally, store errors in search params or a cookie/flash store
-    return redirect("/error");
+  if (!parsed.success) {
+    redirectWithToast("/login", "error", {
+      m: "Please enter a valid email and password.",
+    });
   }
 
-  const data = parseResult.data;
-
-  const { error } = await supabase.auth.signInWithPassword({
-    email: data.email,
-    password: data.password,
-  });
-
-  if (error) {
-    console.log("Login error:", error);
-    redirect("/error");
+  const { email, password } = parsed.data;
+  const res = await doLogin(email, password);
+  if (!res.ok) {
+    redirectWithToast("/login", "error", { m: res.error ?? undefined });
   }
 
   revalidatePath("/", "layout");
-  redirect("/home");
+  redirectWithToast("/home", "login_success");
 }
 
-export type LoginState = {
-  ok: boolean;
-  error?: string | null;
-};
-
-export async function loginAction(_prev: LoginState, formData: FormData): Promise<LoginState> {
-  const supabase = await createClient();
-
-  const LoginSchema = z.object({
-    email: EmailSchema,
-    password: PasswordSchema,
-  });
-
+// If you’re using useFormState for login from a client component
+export type LoginState = { ok: boolean; error?: string | null };
+export async function loginAction(
+  _prev: LoginState,
+  formData: FormData
+): Promise<LoginState> {
   const parsed = LoginSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
   });
   if (!parsed.success) {
-    return { ok: false, error: "Please enter a valid email and an 8+ char password." };
+    return {
+      ok: false,
+      error: "Please enter a valid email and an 8+ char password.",
+    };
   }
 
   const { email, password } = parsed.data;
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) {
-    console.log("Login error:", error);
+  const res = await doLogin(email, password);
+  if (!res.ok) {
     return { ok: false, error: "Invalid email or password." };
   }
 
@@ -74,44 +122,37 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
 }
 
 export async function signup(formData: FormData) {
-  const supabase = await createClient();
-
-  // Validate email, password, and name
-  const parseResult = AuthSchema.safeParse({
+  const parsed = SignupSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
     name: formData.get("name"),
   });
 
-  if (!parseResult.success) {
-    return redirect("/error");
+  if (!parsed.success) {
+    redirectWithToast("/signup", "error", {
+      m: "Please fill in all fields correctly.",
+    });
   }
 
-  const data = parseResult.data;
-
-  const { error } = await supabase.auth.signUp({
-    email: data.email,
-    password: data.password,
-    options: {
-      data: {
-        display_name: data.name,
-      },
-    },
-  });
-
-  if (error) {
-    return redirect("/error");
+  const { email, password, name } = parsed.data;
+  const res = await doSignup(email, password, name);
+  if (!res.ok) {
+    redirectWithToast("/signup", "error", { m: res.error ?? undefined });
   }
 
+  // Revalidate and redirect to "/" with a toast flag.
   revalidatePath("/", "layout");
-  redirect("/");
+
+  // message will be either "verify_email" or "signup_success"
+  const toastKey = res.message || "signup_success";
+  redirectWithToast("/", toastKey);
 }
 
 export async function logout() {
   const supabase = await createClient();
   await supabase.auth.signOut();
   revalidatePath("/", "layout");
-  redirect("/login");
+  redirectWithToast("/login", "logout_success");
 }
 
 export type ChangePasswordState = {
@@ -134,12 +175,6 @@ export async function changePasswordAction(
   if (userError || !user) {
     return { ok: false, error: "Not authenticated." };
   }
-
-  const ChangePasswordSchema = z.object({
-    currentPassword: PasswordSchema,
-    newPassword: PasswordSchema,
-    confirmPassword: PasswordSchema,
-  });
 
   const parsed = ChangePasswordSchema.safeParse({
     currentPassword: formData.get("currentPassword"),
@@ -171,11 +206,11 @@ export async function changePasswordAction(
     return { ok: false, error: "Unable to verify email." };
   }
 
+  // Verify current password
   const { error: verifyError } = await supabase.auth.signInWithPassword({
     email: user.email,
     password: currentPassword,
   });
-
   if (verifyError) {
     return { ok: false, error: "Current password is incorrect." };
   }
@@ -183,7 +218,6 @@ export async function changePasswordAction(
   const { error: updateError } = await supabase.auth.updateUser({
     password: newPassword,
   });
-
   if (updateError) {
     return {
       ok: false,
