@@ -190,7 +190,6 @@ export function UserButton({
       </DropdownMenu>
 
       <SettingsDialog
-        userId={userId || "self"}
         name={trimmedName}
         email={email}
         imageSrc={imageSrc}

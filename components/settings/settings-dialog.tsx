@@ -7,7 +7,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -15,7 +14,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import {
   Sheet,
@@ -31,44 +29,37 @@ import {
   Palette,
   Shield,
   User as UserIcon,
-  Monitor,
-  Sun,
-  Moon,
   ZoomIn,
   ZoomOut,
   RotateCw,
   Maximize,
   Loader2,
-  Sparkles,
-  Coffee,
-  Flower2,
-  Zap,
-  Mountain,
-  type LucideIcon,
-  Bird,
-  Citrus,
-  Music,
-  Code,
   Check,
   Camera,
   X,
   Upload,
   Trash2,
-  Sunset,
-  Frame,
-  Gem,
-  Star,
-  CakeSlice,
+  Pencil,
+  Images,
 } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/util/supabase/client";
 import { updateProfileAvatar } from "@/util/actions/profileActions";
-import { useTheme } from "next-themes";
 import { SectionHeader } from "./section-header";
 import SettingsUserCard from "./settings-user-card";
+import UserSettingsCard from "./settings-userSettings-card";
+import { SettingsAppearanceCard } from "./settings-appearance-card";
+import SettingsNotificationCard from "./settings-notifications-card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export type SettingsDialogProps = {
-  userId: string;
   name: string;
   email: string;
   imageSrc?: string | null;
@@ -110,273 +101,8 @@ const NAV_ITEMS: {
   },
 ];
 
-interface ColorPaletteConfig {
-  id: string;
-  label: string;
-  description: string;
-  icon: LucideIcon;
-  preview: {
-    primary: string;
-    secondary: string;
-    accent: string;
-    muted: string;
-    background: string;
-    foreground: string;
-  };
-  dataThemeAttribute?: string;
-}
-
-const COLOR_PALETTES: ColorPaletteConfig[] = [
-  {
-    id: "default",
-    label: "Default",
-    description:
-      "A balanced, clean, and modern appearance suitable for any interface.",
-    icon: Sparkles,
-    preview: {
-      primary: "bg-[#e5e5e5]",
-      secondary: "bg-[#262626]",
-      accent: "bg-[#404040]",
-      muted: "bg-[#262626]",
-      background: "bg-[#0a0a0a]",
-      foreground: "bg-[#fafafa]",
-    },
-  },
-  {
-    id: "mocha-mousse",
-    label: "Mocha Mousse",
-    description:
-      "Warm, soft, and cozy tones that bring a sense of comfort and familiarity.",
-    icon: Coffee,
-    preview: {
-      primary: "bg-[#a67c52]",
-      secondary: "bg-[#c4a574]",
-      accent: "bg-[#b89968]",
-      muted: "bg-[#d4c4a8]",
-      background: "bg-[#f5f0e8]",
-      foreground: "bg-[#5c4033]",
-    },
-  },
-  {
-    id: "cyberpunk",
-    label: "Cyberpunk",
-    description: "Bold neon colors with a futuristic and edgy aesthetic.",
-    icon: Zap,
-    preview: {
-      primary: "bg-[#ff00c8]",
-      secondary: "bg-[#00fff7]",
-      accent: "bg-[#ffec00]",
-      muted: "bg-[#1a1a1a]",
-      background: "bg-[#0d0d0d]",
-      foreground: "bg-[#e6e6e6]",
-    },
-  },
-  {
-    id: "claude",
-    label: "Claude",
-    description:
-      "Minimal and thoughtful palette inspired by Anthropic's Claude.",
-    icon: Flower2,
-    preview: {
-      primary: "bg-[#d97757]",
-      secondary: "bg-[#faf9f5]",
-      accent: "bg-[#1a1915]",
-      muted: "bg-[#1b1b19]",
-      background: "bg-[#262624]",
-      foreground: "bg-[#c3c0b6]",
-    },
-  },
-  {
-    id: "twitter",
-    label: "Twitter",
-    description:
-      "Bright, sleek palette inspired by Twitter's signature blue and dark tones.",
-    icon: Bird,
-    preview: {
-      primary: "bg-[#1c9cf0]",
-      secondary: "bg-[#f0f3f4]",
-      accent: "bg-[#061622]",
-      muted: "bg-[#181818]",
-      background: "bg-[#000000]",
-      foreground: "bg-[#e7e9ea]",
-    },
-  },
-  {
-    id: "ghibli-studio",
-    label: "Ghibli Studio",
-    description:
-      "Earthy and nostalgic hues inspired by Studio Ghibli's warm aesthetic.",
-    icon: Mountain,
-    preview: {
-      primary: "bg-[#8b906e]",
-      secondary: "bg-[#3d332b]",
-      accent: "bg-[#3d332b]",
-      muted: "bg-[#2b2523]",
-      background: "bg-[#1a1512]",
-      foreground: "bg-[#e9d4b3]",
-    },
-  },
-  {
-    id: "tangerine",
-    label: "Tangerine",
-    description:
-      "Playful, bright, and energetic colors that bring vibrancy to your UI.",
-    icon: Citrus,
-    preview: {
-      primary: "bg-[#e05d38]",
-      secondary: "bg-[#2a303e]",
-      accent: "bg-[#2a3656]",
-      muted: "bg-[#2a303e]",
-      background: "bg-[#1c2433]",
-      foreground: "bg-[#e5e5e5]",
-    },
-  },
-  {
-    id: "spotify",
-    label: "Spotify",
-    description:
-      "A deep, dark theme highlighted with Spotify's signature green accent.",
-    icon: Music,
-    preview: {
-      primary: "bg-[#00b262]",
-      secondary: "bg-[#282d3d]",
-      accent: "bg-[#282d3d]",
-      muted: "bg-[#282d3d]",
-      background: "bg-[#080b14]",
-      foreground: "bg-[#e9f0f5]",
-    },
-  },
-  {
-    id: "vs-code",
-    label: "VS Code",
-    description:
-      "Cool, focused tones inspired by Visual Studio Code's developer aesthetic.",
-    icon: Code,
-    preview: {
-      primary: "bg-[#26acf4]",
-      secondary: "bg-[#232838]",
-      accent: "bg-[#232838]",
-      muted: "bg-[#232838]",
-      background: "bg-[#0e111b]",
-      foreground: "bg-[#d8dfe4]",
-    },
-  },
-  {
-    id: "caffeine",
-    label: "Caffeine",
-    description:
-      "High-contrast palette designed to keep you sharp and focused.",
-    icon: Coffee,
-    preview: {
-      primary: "bg-[#fcdfc2]",
-      secondary: "bg-[#3a3128]",
-      accent: "bg-[#2b2b2b]",
-      muted: "bg-[#222222]",
-      background: "bg-[#121212]",
-      foreground: "bg-[#eeeeee]",
-    },
-  },
-  {
-    id: "nature",
-    label: "Nature",
-    description:
-      "Organic, earthy tones that bring a calming and natural balance.",
-    icon: Flower2,
-    preview: {
-      primary: "bg-[#6a994e]",
-      secondary: "bg-[#a7c957]",
-      accent: "bg-[#f2e8cf]",
-      muted: "bg-[#386641]",
-      background: "bg-[#1e5128]",
-      foreground: "bg-[#f1faee]",
-    },
-  },
-  {
-    id: "blue-print",
-    label: "Blueprint",
-    description:
-      "A wireframe-inspired palette with structured lines and deep blueprint tones.",
-    icon: Frame,
-    preview: {
-      primary: "bg-[#8b5cf6]",
-      secondary: "bg-[#1e1b4b]",
-      accent: "bg-[#4338ca]",
-      muted: "bg-[#1e1b4b]",
-      background: "bg-[#0f172a]",
-      foreground: "bg-[#e0e7ff]",
-    },
-  },
-  {
-    id: "sunset",
-    label: "Sunset",
-    description:
-      "Warm and radiant hues inspired by the calming beauty of a sunset.",
-    icon: Sunset,
-    preview: {
-      primary: "bg-[#ff7e5f]",
-      secondary: "bg-[#ffedea]",
-      accent: "bg-[#feb47b]",
-      muted: "bg-[#fff0eb]",
-      background: "bg-[#fff9f5]",
-      foreground: "bg-[#3d3436]",
-    },
-  },
-  {
-    id: "amethyst-haze",
-    label: "Amethyst Haze",
-    description:
-      "Soft, dreamy purples and gentle tones that evoke the elegance of twilight.",
-    icon: Gem,
-    preview: {
-      primary: "bg-[#8a79ab]",
-      secondary: "bg-[#dfd9ec]",
-      accent: "bg-[#e6a5b8]",
-      muted: "bg-[#dcd9e3]",
-      background: "bg-[#f8f7fa]",
-      foreground: "bg-[#3d3c4f]",
-    },
-  },
-  {
-    id: "aurora-glow",
-    label: "Aurora Glow",
-    description:
-      "A vibrant and colorful theme inspired by the natural phenomenon of the aurora borealis.",
-    icon: Star,
-    preview: {
-      primary: "bg-[#00e0d7]",
-      secondary: "bg-[#6262cc]",
-      accent: "bg-[#1a2550]",
-      muted: "bg-[#0d1936]",
-      background: "bg-[#020819]",
-      foreground: "bg-[#e9f3fb]",
-    },
-  },
-  {
-    id: "butterscotch",
-    label: "Butterscotch",
-    description:
-      "Rich, warm tones inspired by the sweetness and comfort of butterscotch, evoking a cozy and inviting atmosphere",
-    icon: CakeSlice,
-    preview: {
-      primary: "bg-[#cc9c42]",
-      secondary: "bg-[#f7f2e3]",
-      accent: "bg-[#f7f2e3]",
-      muted: "bg-[#f7f2e3]",
-      background: "bg-[#fffcf1]",
-      foreground: "bg-[#3f3112]",
-    },
-  },
-];
-
-const getPaletteConfig = (id: string): ColorPaletteConfig | undefined =>
-  COLOR_PALETTES.find((p) => p.id === id);
-
-type ThemeChoice = "system" | "light" | "dark";
-type ColorPalette = (typeof COLOR_PALETTES)[number]["id"];
-
 // Mobile-first settings with creative navigation
 export function SettingsDialog({
-  userId,
   name,
   email,
   imageSrc = null,
@@ -384,11 +110,6 @@ export function SettingsDialog({
 }: SettingsDialogProps) {
   const nameRef = React.useRef<HTMLInputElement>(null);
   const emailRef = React.useRef<HTMLInputElement>(null);
-  const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = React.useState(false);
-  const [themeChoice, setThemeChoice] = React.useState<ThemeChoice>("system");
-  const [colorPalette, setColorPalette] =
-    React.useState<ColorPalette>("default");
   const [isMobile, setIsMobile] = React.useState(false);
 
   // Detect mobile
@@ -397,32 +118,6 @@ export function SettingsDialog({
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
-  }, []);
-
-  React.useEffect(() => setMounted(true), []);
-  React.useEffect(() => {
-    if (!mounted) return;
-    if (theme === "system" || theme === "light" || theme === "dark") {
-      setThemeChoice(theme);
-    }
-  }, [mounted, theme]);
-
-  React.useEffect(() => {
-    const saved = localStorage.getItem("color-palette");
-    if (saved && getPaletteConfig(saved)) {
-      setColorPalette(saved as ColorPalette);
-      applyColorPalette(saved as ColorPalette);
-    }
-  }, []);
-
-  const applyColorPalette = React.useCallback((paletteId: ColorPalette) => {
-    const root = document.documentElement;
-    root.removeAttribute("data-theme");
-    if (paletteId !== "default") {
-      const cfg = getPaletteConfig(paletteId);
-      root.setAttribute("data-theme", cfg?.dataThemeAttribute ?? paletteId);
-    }
-    localStorage.setItem("color-palette", paletteId);
   }, []);
 
   const trimmedName = name?.trim() || "";
@@ -438,18 +133,6 @@ export function SettingsDialog({
 
   const [imgError, setImgError] = React.useState(false);
   const [active, setActive] = React.useState<Section>(initialSection);
-  const [prevActive, setPrevActive] = React.useState<Section>(initialSection);
-
-  // Track animation direction
-  const isMovingForward =
-    NAV_ITEMS.findIndex((i) => i.key === active) >
-    NAV_ITEMS.findIndex((i) => i.key === prevActive);
-
-  React.useEffect(() => {
-    if (active !== prevActive) {
-      setPrevActive(active);
-    }
-  }, [active]);
 
   const [localAvatar, setLocalAvatar] = React.useState<string | null>(null);
   const [avatarFile, setAvatarFile] = React.useState<File | null>(null);
@@ -463,6 +146,11 @@ export function SettingsDialog({
     null
   );
   const [avatarOptionsOpen, setAvatarOptionsOpen] = React.useState(false);
+
+  // UI-only state
+  const [editingName, setEditingName] = React.useState(false);
+  const [editingEmail, setEditingEmail] = React.useState(false);
+  const [avatarGalleryOpen, setAvatarGalleryOpen] = React.useState(false);
 
   React.useEffect(() => {
     return () => {
@@ -478,6 +166,7 @@ export function SettingsDialog({
   const isSaving = (section: Section) => savingSection === section;
 
   const avatarInputId = React.useId();
+  const avatarInputRef = React.useRef<HTMLInputElement>(null);
 
   const onAvatarFile = (file?: File | null) => {
     if (!file) return;
@@ -485,6 +174,8 @@ export function SettingsDialog({
     const url = URL.createObjectURL(file);
     setTempImageUrl(url);
     setCropperOpen(true);
+    // Reset input value so same file can be selected again
+    if (avatarInputRef.current) avatarInputRef.current.value = "";
   };
 
   const handleCropComplete = (croppedUrl: string, file: File) => {
@@ -555,6 +246,16 @@ export function SettingsDialog({
 
   return (
     <>
+      {/* Single file input for avatar upload, used by both desktop and mobile */}
+      <input
+        id={avatarInputId}
+        ref={avatarInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => onAvatarFile(e.target.files?.[0])}
+      />
+
       <DialogContent
         className={cn(
           "p-0 overflow-hidden bg-background",
@@ -564,6 +265,12 @@ export function SettingsDialog({
           "sm:w-[900px] sm:max-w-[900px] sm:h-[640px] sm:rounded-xl sm:border"
         )}
       >
+        <DialogHeader className="sr-only">
+          <DialogTitle>Settings</DialogTitle>
+          <DialogDescription>
+            Manage your account preferences.
+          </DialogDescription>
+        </DialogHeader>
         <div className="flex h-full flex-col">
           {/* Mobile Header with Back Navigation */}
           <div className="md:hidden sticky top-0 z-30 border-b bg-background">
@@ -665,10 +372,7 @@ export function SettingsDialog({
               <div
                 className={cn(
                   "absolute inset-0 overflow-y-auto p-4 md:p-6",
-                  "animate-in fade-in-0 duration-200",
-                  isMovingForward
-                    ? "slide-in-from-right-10"
-                    : "slide-in-from-left-10"
+                  "animate-in fade-in-0 duration-200"
                 )}
                 key={active}
               >
@@ -679,260 +383,258 @@ export function SettingsDialog({
                       description="Update your personal information"
                     />
 
-                    {/* Mobile-optimized Avatar Section */}
-                    <div className="flex flex-col items-center sm:flex-row sm:items-start gap-4">
-                      <button
-                        onClick={() => isMobile && setAvatarOptionsOpen(true)}
-                        className="relative group cursor-pointer"
-                      >
-                        <Avatar className="h-24 w-24 sm:h-16 sm:w-16 ring-2 ring-border">
-                          {effectiveImage && (
-                            <AvatarImage
-                              src={effectiveImage}
-                              alt={trimmedName || "User"}
-                              onError={() => setImgError(true)}
-                            />
-                          )}
-                          <AvatarFallback className="text-2xl sm:text-lg">
-                            {initials}
-                          </AvatarFallback>
-                        </Avatar>
-                        {isMobile && (
-                          <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Camera className="h-6 w-6 text-white" />
-                          </div>
-                        )}
-                      </button>
-
-                      {/* Desktop Avatar Actions */}
-                      {!isMobile && (
-                        <div className="space-x-2">
-                          <input
-                            id={avatarInputId}
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) => onAvatarFile(e.target.files?.[0])}
-                          />
-                          <Button
-                            variant="secondary"
-                            onClick={() =>
-                              document.getElementById(avatarInputId)?.click()
-                            }
-                          >
-                            Upload new
-                          </Button>
-                          {effectiveImage && (
-                            <Button
-                              variant="ghost"
-                              onClick={() => {
-                                setLocalAvatar(null);
-                                setImgError(false);
-                                setAvatarFile(null);
-                                setAvatarRemoved(true);
-                                toast("Avatar removed");
-                              }}
+                    <div className="grid gap-6">
+                      {/* Avatar card */}
+                      <div className="rounded-xl border bg-card text-card-foreground p-6">
+                        <div className="flex flex-col items-center text-center gap-4">
+                          {/* Desktop: dropdown on click. Mobile: open bottom sheet. */}
+                          {isMobile ? (
+                            <button
+                              type="button"
+                              aria-label="Edit avatar"
+                              onClick={() => setAvatarOptionsOpen(true)}
+                              className="group relative block rounded-full outline-none"
                             >
-                              Remove
-                            </Button>
+                              <Avatar className="h-28 w-28 sm:h-32 sm:w-32 ring-2 ring-border shadow-sm transition-transform group-active:scale-95">
+                                {effectiveImage && (
+                                  <AvatarImage
+                                    src={effectiveImage}
+                                    alt={trimmedName || "User"}
+                                    onError={() => setImgError(true)}
+                                  />
+                                )}
+                                <AvatarFallback className="text-2xl">
+                                  {initials}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-black/35 opacity-0 transition-opacity group-hover:opacity-100">
+                                <span className="inline-flex items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white">
+                                  <Pencil className="h-3.5 w-3.5" />
+                                  Edit
+                                </span>
+                              </div>
+                            </button>
+                          ) : (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button
+                                  type="button"
+                                  aria-label="Avatar actions"
+                                  className="group relative block rounded-full outline-none"
+                                >
+                                  <Avatar className="h-28 w-28 sm:h-32 sm:w-32 ring-2 ring-border shadow-sm transition-transform group-active:scale-95">
+                                    {effectiveImage && (
+                                      <AvatarImage
+                                        src={effectiveImage}
+                                        alt={trimmedName || "User"}
+                                        onError={() => setImgError(true)}
+                                      />
+                                    )}
+                                    <AvatarFallback className="text-2xl">
+                                      {initials}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-black/35 opacity-0 transition-opacity group-hover:opacity-100">
+                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white">
+                                      <Pencil className="h-3.5 w-3.5" />
+                                      Edit photo
+                                    </span>
+                                  </div>
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent
+                                align="center"
+                                className="w-48"
+                              >
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    avatarInputRef.current?.click();
+                                  }}
+                                >
+                                  <Upload className="mr-2 h-4 w-4" />
+                                  Upload photo
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => setAvatarGalleryOpen(true)}
+                                >
+                                  <Images className="mr-2 h-4 w-4" />
+                                  Browse avatars
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  disabled={!effectiveImage}
+                                  className="text-destructive focus:text-destructive"
+                                  onClick={() => {
+                                    setLocalAvatar(null);
+                                    setImgError(false);
+                                    setAvatarFile(null);
+                                    setAvatarRemoved(true);
+                                    toast("Avatar removed");
+                                  }}
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Remove photo
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           )}
+
+                          <p className="text-sm text-muted-foreground">
+                            Recommended 256×256+; JPG, PNG, or WebP. Cropped to
+                            a circle.
+                          </p>
                         </div>
-                      )}
+                      </div>
+
+                      {/* Info card */}
+                      <div className="rounded-xl border bg-card text-card-foreground p-6">
+                        <div className="grid gap-5 sm:grid-cols-2">
+                          {/* Name */}
+                          <div className="grid gap-2">
+                            <div className="flex items-center justify-between">
+                              <Label htmlFor="name">Display name</Label>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 px-2 gap-1.5"
+                                onClick={() => {
+                                  setEditingName((v) => !v);
+                                  if (!editingName) {
+                                    setTimeout(
+                                      () => nameRef.current?.focus(),
+                                      0
+                                    );
+                                  }
+                                }}
+                              >
+                                {editingName ? (
+                                  <>
+                                    <Check className="h-4 w-4" />
+                                    Done
+                                  </>
+                                ) : (
+                                  <>
+                                    <Pencil className="h-4 w-4" />
+                                    Edit
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                            <Input
+                              id="name"
+                              defaultValue={trimmedName}
+                              ref={nameRef}
+                              disabled={!editingName}
+                              className="h-11 sm:h-10 text-sm disabled:opacity-100 disabled:bg-muted/50"
+                              aria-describedby="name-hint"
+                            />
+                            <p
+                              id="name-hint"
+                              className="text-xs text-muted-foreground"
+                            >
+                              This is your public name. Use Save to apply
+                              changes.
+                            </p>
+                          </div>
+
+                          {/* Email */}
+                          <div className="grid gap-2">
+                            <div className="flex items-center justify-between">
+                              <Label htmlFor="email">Email</Label>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 px-2 gap-1.5"
+                                onClick={() => {
+                                  setEditingEmail((v) => !v);
+                                  if (!editingEmail) {
+                                    setTimeout(
+                                      () => emailRef.current?.focus(),
+                                      0
+                                    );
+                                  }
+                                }}
+                              >
+                                {editingEmail ? (
+                                  <>
+                                    <Check className="h-4 w-4" />
+                                    Done
+                                  </>
+                                ) : (
+                                  <>
+                                    <Pencil className="h-4 w-4" />
+                                    Edit
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                            <Input
+                              id="email"
+                              defaultValue={email}
+                              type="email"
+                              ref={emailRef}
+                              disabled={!editingEmail}
+                              className="h-11 sm:h-10 text-sm disabled:opacity-100 disabled:bg-muted/50"
+                              aria-describedby="email-hint"
+                            />
+                            <p
+                              id="email-hint"
+                              className="text-xs text-muted-foreground"
+                            >
+                              Changing your email may require re‑verification.
+                              Remember to Save.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="grid gap-4">
-                      <div className="grid gap-2">
-                        <Label htmlFor="name">Name</Label>
-                        <Input
-                          id="name"
-                          defaultValue={trimmedName}
-                          ref={nameRef}
-                          className="h-12 text-base sm:h-10 sm:text-sm"
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="email">Email</Label>
-                        <Input
-                          id="email"
-                          defaultValue={email}
-                          type="email"
-                          ref={emailRef}
-                          className="h-12 text-base sm:h-10 sm:text-sm"
-                        />
-                      </div>
-                    </div>
+                    {/* Browse avatars dialog (skeleton only) */}
+                    <Dialog
+                      open={avatarGalleryOpen}
+                      onOpenChange={setAvatarGalleryOpen}
+                    >
+                      <DialogContent className="sm:max-w-[560px]">
+                        <DialogHeader>
+                          <DialogTitle>Choose an avatar</DialogTitle>
+                          <DialogDescription>
+                            Pick from our preset gallery.
+                          </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 max-h-[60vh] overflow-auto pt-2">
+                          {Array.from({ length: 18 }).map((_, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              className="group relative aspect-square rounded-full ring-1 ring-border hover:ring-primary/60 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                              disabled
+                            >
+                              <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-full bg-muted">
+                                <Skeleton className="h-full w-full rounded-full" />
+                              </div>
+                              <span className="sr-only">Avatar {i + 1}</span>
+                            </button>
+                          ))}
+                        </div>
+
+                        <p className="text-xs text-muted-foreground pt-2">
+                          Preset avatars coming soon.
+                        </p>
+                      </DialogContent>
+                    </Dialog>
                   </section>
                 )}
 
                 {active === "account" && <SettingsUserCard />}
 
-                {active === "security" && (
-                  <section className="space-y-6">
-                    <SectionHeader
-                      title="Security"
-                      description="Manage your account security"
-                    />
+                {active === "security" && <UserSettingsCard />}
 
-                    <div className="space-y-4">
-                      <Card
-                        title="Password"
-                        description="Change your password"
-                        action={
-                          <Button variant="outline" size="sm">
-                            Update
-                          </Button>
-                        }
-                      />
+                {active === "notifications" && <SettingsNotificationCard />}
 
-                      <Card
-                        title="Two-factor authentication"
-                        description="Add an extra layer of security"
-                        action={
-                          <Switch
-                            onCheckedChange={(checked) =>
-                              toast(checked ? "2FA enabled" : "2FA disabled")
-                            }
-                          />
-                        }
-                      />
-                    </div>
-                  </section>
-                )}
-
-                {active === "notifications" && (
-                  <section className="space-y-6">
-                    <SectionHeader
-                      title="Notifications"
-                      description="Choose how you receive updates"
-                    />
-
-                    <div className="space-y-2">
-                      {[
-                        {
-                          label: "Product updates",
-                          desc: "New features and improvements",
-                        },
-                        {
-                          label: "Security alerts",
-                          desc: "Important security notifications",
-                        },
-                        {
-                          label: "Marketing",
-                          desc: "Tips, offers, and announcements",
-                        },
-                      ].map((item) => (
-                        <Card
-                          key={item.label}
-                          title={item.label}
-                          description={item.desc}
-                          action={
-                            <Switch
-                              onCheckedChange={(v) =>
-                                toast(`${item.label} ${v ? "on" : "off"}`)
-                              }
-                            />
-                          }
-                        />
-                      ))}
-                    </div>
-                  </section>
-                )}
-
-                {active === "appearance" && (
-                  <section className="space-y-6">
-                    <SectionHeader
-                      title="Appearance"
-                      description="Customize your interface"
-                    />
-
-                    {/* Theme Selection - Mobile optimized */}
-                    <div className="space-y-3">
-                      <Label className="text-xs uppercase tracking-wider text-muted-foreground">
-                        Theme
-                      </Label>
-                      <div className="grid grid-cols-3 gap-2">
-                        {[
-                          {
-                            value: "system" as const,
-                            label: "Auto",
-                            icon: Monitor,
-                          },
-                          {
-                            value: "light" as const,
-                            label: "Light",
-                            icon: Sun,
-                          },
-                          { value: "dark" as const, label: "Dark", icon: Moon },
-                        ].map(({ value, label, icon: Icon }) => (
-                          <button
-                            key={value}
-                            onClick={() => {
-                              setThemeChoice(value);
-                              setTheme(value);
-                              toast(`Theme: ${label}`);
-                            }}
-                            className={cn(
-                              "relative flex flex-col items-center gap-2 rounded-lg border-2 p-3 transition-all",
-                              themeChoice === value
-                                ? "border-primary bg-primary/5"
-                                : "border-border hover:border-primary/40"
-                            )}
-                          >
-                            <Icon className="h-5 w-5" />
-                            <span className="text-xs">{label}</span>
-                            {themeChoice === value && (
-                              <div className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary flex items-center justify-center">
-                                <Check className="h-2.5 w-2.5 text-primary-foreground" />
-                              </div>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Color Palettes - Mobile optimized grid */}
-                    <div className="space-y-3">
-                      <Label className="text-xs uppercase tracking-wider text-muted-foreground">
-                        Color Scheme
-                      </Label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {COLOR_PALETTES.map((palette) => (
-                          <button
-                            key={palette.id}
-                            onClick={() => {
-                              const id = palette.id as ColorPalette;
-                              setColorPalette(id);
-                              applyColorPalette(id);
-                              toast(`Palette: ${palette.label}`);
-                            }}
-                            className={cn(
-                              "relative rounded-lg border-2 p-3 text-left transition-all",
-                              colorPalette === palette.id
-                                ? "border-primary bg-primary/5"
-                                : "border-border hover:border-primary/40"
-                            )}
-                          >
-                            <div className="flex items-center gap-2 mb-2">
-                              <palette.icon className="h-4 w-4" />
-                              <span className="text-sm font-medium">
-                                {palette.label}
-                              </span>
-                            </div>
-                            <div className="text-xs text-muted-foreground mb-2">
-                              {palette.description}
-                            </div>
-                            <ColorSwatches preview={palette.preview} />
-                            {colorPalette === palette.id && (
-                              <div className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary flex items-center justify-center">
-                                <Check className="h-2.5 w-2.5 text-primary-foreground" />
-                              </div>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </section>
-                )}
+                {active === "appearance" && <SettingsAppearanceCard />}
               </div>
             </main>
           </div>
@@ -994,18 +696,11 @@ export function SettingsDialog({
             <SheetDescription>Choose an option</SheetDescription>
           </SheetHeader>
           <div className="grid gap-2 py-4">
-            <input
-              id={avatarInputId}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => onAvatarFile(e.target.files?.[0])}
-            />
             <Button
               variant="outline"
               className="justify-start"
               onClick={() => {
-                document.getElementById(avatarInputId)?.click();
+                avatarInputRef.current?.click();
               }}
             >
               <Upload className="mr-2 h-4 w-4" />
@@ -1063,7 +758,6 @@ export function SettingsDialog({
   );
 }
 
-// Mobile-optimized cropper
 function MobileFriendlyCropper({
   open,
   onOpenChange,
@@ -1083,6 +777,12 @@ function MobileFriendlyCropper({
   );
   const [isProcessing, setIsProcessing] = React.useState(false);
 
+  const reset = () => {
+    setCrop({ x: 0, y: 0 });
+    setZoom(1);
+    setRotation(0);
+  };
+
   const handleSave = async () => {
     if (!croppedAreaPixels) return;
     setIsProcessing(true);
@@ -1094,89 +794,124 @@ function MobileFriendlyCropper({
       );
       onCropComplete(url, file);
       onOpenChange(false);
-    } catch (error) {
+    } catch {
       toast.error("Failed to process image");
     } finally {
       setIsProcessing(false);
     }
   };
 
+  // Reset state when dialog closes
+  React.useEffect(() => {
+    if (!open) reset();
+  }, [open]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="p-0 w-screen h-[100svh] max-h-[100svh] rounded-none">
-        {/* Header */}
-        <div className="sticky top-0 z-30 flex items-center justify-between p-4 border-b bg-background">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onOpenChange(false)}
-          >
-            <X className="h-5 w-5" />
-          </Button>
-          <span className="font-semibold">Crop Image</span>
-          <Button size="sm" onClick={handleSave} disabled={isProcessing}>
-            {isProcessing ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              "Done"
-            )}
-          </Button>
-        </div>
+      <DialogContent
+        className="
+          p-0 overflow-hidden
+          w-[min(100vw,640px)] sm:max-w-[640px]
+          max-h-[90svh]
+          rounded-none sm:rounded-xl
+        "
+      >
+        <DialogHeader className="sr-only">
+          <DialogTitle>Crop Image</DialogTitle>
+          <DialogDescription>
+            Adjust your new avatar before saving.
+          </DialogDescription>
+        </DialogHeader>
 
-        {/* Cropper */}
-        <div className="relative flex-1 bg-black">
-          <Cropper
-            image={imageUrl}
-            crop={crop}
-            zoom={zoom}
-            rotation={rotation}
-            aspect={1}
-            cropShape="round"
-            onCropChange={setCrop}
-            onZoomChange={setZoom}
-            onRotationChange={setRotation}
-            onCropComplete={(_, pixels) => setCroppedAreaPixels(pixels)}
-            showGrid={false}
-          />
-        </div>
-
-        {/* Controls */}
-        <div className="sticky bottom-0 z-30 border-t bg-background p-4 space-y-4">
-          <div className="flex items-center gap-4">
-            <ZoomOut className="h-4 w-4 text-muted-foreground" />
-            <Slider
-              value={[zoom]}
-              onValueChange={([v]) => setZoom(v)}
-              min={1}
-              max={3}
-              step={0.01}
-              className="flex-1"
-            />
-            <ZoomIn className="h-4 w-4 text-muted-foreground" />
+        <div className="flex max-h-[90svh] flex-col">
+          {/* Header */}
+          <div className="shrink-0 sticky top-0 z-30 flex items-center justify-between p-4 border-b bg-background">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onOpenChange(false)}
+            >
+              <X className="h-5 w-5" />
+            </Button>
+            <span className="font-semibold">Crop Image</span>
+            <Button size="sm" onClick={handleSave} disabled={isProcessing}>
+              {isProcessing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Done"
+              )}
+            </Button>
           </div>
 
-          <div className="flex justify-center gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setRotation((r) => r - 90)}
-            >
-              <RotateCw className="h-4 w-4 rotate-180" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setRotation(0)}
-            >
-              <Maximize className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setRotation((r) => r + 90)}
-            >
-              <RotateCw className="h-4 w-4" />
-            </Button>
+          <div
+            className="
+              relative w-full bg-black
+              h-[min(60svh,420px)] sm:h-[360px]
+            "
+          >
+            <Cropper
+              image={imageUrl}
+              crop={crop}
+              zoom={zoom}
+              rotation={rotation}
+              aspect={1}
+              cropShape="round"
+              onCropChange={setCrop}
+              onZoomChange={(z) => setZoom(z)}
+              onRotationChange={setRotation}
+              onCropComplete={(_, pixels) => setCroppedAreaPixels(pixels)}
+              showGrid={false}
+              zoomWithScroll
+              restrictPosition
+            />
+          </div>
+
+          {/* Controls */}
+          <div className="shrink-0 sticky bottom-0 z-30 border-t bg-background p-4 space-y-4">
+            <div className="flex items-center gap-4">
+              <ZoomOut className="h-4 w-4 text-muted-foreground" />
+              <Slider
+                value={[zoom]}
+                onValueChange={([v]) => setZoom(v)}
+                min={1}
+                max={3}
+                step={0.01}
+                className="flex-1"
+                aria-label="Zoom"
+              />
+              <ZoomIn className="h-4 w-4 text-muted-foreground" />
+            </div>
+
+            <div className="flex items-center justify-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setRotation((r) => r - 90)}
+                aria-label="Rotate left"
+              >
+                <RotateCw className="h-4 w-4 rotate-180" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setRotation(0)}
+                aria-label="Reset rotation"
+              >
+                <Maximize className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setRotation((r) => r + 90)}
+                aria-label="Rotate right"
+              >
+                <RotateCw className="h-4 w-4" />
+              </Button>
+              <div className="mx-2 h-4 w-px bg-border" />
+              <Button variant="ghost" size="sm" onClick={reset}>
+                Reset
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>
@@ -1184,117 +919,112 @@ function MobileFriendlyCropper({
   );
 }
 
-// Utility Components
-function Card({
-  title,
-  description,
-  action,
-}: {
-  title: string;
-  description: string;
-  action?: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-center justify-between rounded-lg border p-4">
-      <div className="space-y-0.5">
-        <div className="text-sm font-medium">{title}</div>
-        <div className="text-xs text-muted-foreground">{description}</div>
-      </div>
-      {action}
-    </div>
-  );
+function getRadianAngle(deg: number) {
+  return (deg * Math.PI) / 180;
 }
 
-function ColorSwatches({
-  preview,
-}: {
-  preview: ColorPaletteConfig["preview"];
-}) {
-  return (
-    <div className="flex gap-1">
-      <div className={cn("h-4 w-4 rounded", preview.primary)} />
-      <div className={cn("h-4 w-4 rounded", preview.secondary)} />
-      <div className={cn("h-4 w-4 rounded", preview.accent)} />
-      <div className={cn("h-4 w-4 rounded", preview.background)} />
-    </div>
-  );
+function rotateSize(width: number, height: number, rotation: number) {
+  const rotRad = getRadianAngle(rotation);
+  return {
+    width:
+      Math.abs(Math.cos(rotRad) * width) + Math.abs(Math.sin(rotRad) * height),
+    height:
+      Math.abs(Math.sin(rotRad) * width) + Math.abs(Math.cos(rotRad) * height),
+  };
 }
 
-// Image processing utilities
 async function getCroppedImg(
   imageSrc: string,
   pixelCrop: Area,
-  rotation = 0
+  rotation = 0,
+  opts?: {
+    maxSize?: number; // longest side in px
+    quality?: number; // 0..1
+    mimeType?: "image/webp" | "image/png" | "image/jpeg";
+    circleMask?: boolean; // optional: output round image
+  }
 ): Promise<{ file: File; url: string }> {
   const image = await createImage(imageSrc);
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("No 2d context");
 
-  const maxSize = 384;
+  const maxSize = opts?.maxSize ?? 384;
+  const quality = opts?.quality ?? 0.9;
+  const mimeType = opts?.mimeType ?? "image/webp";
+
+  const { width: bW, height: bH } = rotateSize(
+    image.width,
+    image.height,
+    rotation
+  );
+  const tmpCanvas = document.createElement("canvas");
+  tmpCanvas.width = Math.max(1, Math.round(bW));
+  tmpCanvas.height = Math.max(1, Math.round(bH));
+  const tctx = tmpCanvas.getContext("2d", { willReadFrequently: true });
+  if (!tctx) throw new Error("No 2d context");
+
+  tctx.imageSmoothingEnabled = true;
+  tctx.imageSmoothingQuality = "high";
+
+  tctx.translate(tmpCanvas.width / 2, tmpCanvas.height / 2);
+  tctx.rotate(getRadianAngle(rotation));
+  tctx.translate(-image.width / 2, -image.height / 2);
+  tctx.drawImage(image, 0, 0);
+
   const scale = Math.min(
     1,
     maxSize / Math.max(pixelCrop.width, pixelCrop.height)
   );
+  const outW = Math.max(1, Math.round(pixelCrop.width * scale));
+  const outH = Math.max(1, Math.round(pixelCrop.height * scale));
 
-  canvas.width = pixelCrop.width * scale;
-  canvas.height = pixelCrop.height * scale;
+  const outCanvas = document.createElement("canvas");
+  outCanvas.width = outW;
+  outCanvas.height = outH;
+  const octx = outCanvas.getContext("2d");
+  if (!octx) throw new Error("No 2d context");
 
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
+  octx.imageSmoothingEnabled = true;
+  octx.imageSmoothingQuality = "high";
 
-  if (rotation) {
-    const rotRad = (rotation * Math.PI) / 180;
-    const sin = Math.abs(Math.sin(rotRad));
-    const cos = Math.abs(Math.cos(rotRad));
-    const newWidth = pixelCrop.width * cos + pixelCrop.height * sin;
-    const newHeight = pixelCrop.width * sin + pixelCrop.height * cos;
-
-    canvas.width = newWidth * scale;
-    canvas.height = newHeight * scale;
-
-    ctx.translate(canvas.width / 2, canvas.height / 2);
-    ctx.rotate(rotRad);
-    ctx.translate(
-      (-pixelCrop.width * scale) / 2,
-      (-pixelCrop.height * scale) / 2
-    );
-  }
-
-  ctx.drawImage(
-    image,
+  octx.drawImage(
+    tmpCanvas,
     pixelCrop.x,
     pixelCrop.y,
     pixelCrop.width,
     pixelCrop.height,
     0,
     0,
-    pixelCrop.width * scale,
-    pixelCrop.height * scale
+    outW,
+    outH
   );
 
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => {
-        if (!blob) {
-          reject(new Error("Canvas is empty"));
-          return;
-        }
-        const file = new File([blob], "avatar.webp", { type: "image/webp" });
-        const url = URL.createObjectURL(blob);
-        resolve({ file, url });
-      },
-      "image/webp",
-      0.85
+  if (opts?.circleMask) {
+    octx.globalCompositeOperation = "destination-in";
+    octx.beginPath();
+    octx.arc(outW / 2, outH / 2, Math.min(outW, outH) / 2, 0, Math.PI * 2);
+    octx.closePath();
+    octx.fill();
+  }
+
+  const blob: Blob = await new Promise((resolve, reject) => {
+    outCanvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error("Canvas is empty"))),
+      mimeType,
+      quality
     );
   });
+
+  const file = new File([blob], "avatar.webp", { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  return { file, url };
 }
 
 function createImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
-    image.addEventListener("load", () => resolve(image));
-    image.addEventListener("error", (error) => reject(error));
+    image.crossOrigin = "anonymous";
+    image.decoding = "async";
+    image.onload = () => resolve(image);
+    image.onerror = (event: Event | string) => reject(event);
     image.src = url;
   });
 }
@@ -1305,35 +1035,4 @@ function formatFileSize(bytes: number): string {
   const sizes = ["Bytes", "KB", "MB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return Math.round((bytes / Math.pow(k, i)) * 10) / 10 + " " + sizes[i];
-}
-
-function ToggleRow({
-  label,
-  description,
-  defaultChecked,
-  onChange,
-}: {
-  label: string;
-  description?: string;
-  defaultChecked?: boolean;
-  onChange?: (checked: boolean) => void;
-}) {
-  const [checked, setChecked] = React.useState(!!defaultChecked);
-  return (
-    <div className="flex items-center justify-between rounded-md border p-3">
-      <div className="pr-4">
-        <div className="text-sm font-medium">{label}</div>
-        {description && (
-          <div className="text-xs text-muted-foreground">{description}</div>
-        )}
-      </div>
-      <Switch
-        checked={checked}
-        onCheckedChange={(v) => {
-          setChecked(v);
-          onChange?.(v);
-        }}
-      />
-    </div>
-  );
 }
