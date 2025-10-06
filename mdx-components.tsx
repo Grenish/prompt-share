@@ -1,33 +1,75 @@
+// mdx-components.tsx
 import type { MDXComponents } from "mdx/types";
 import Link from "next/link";
 import Image from "next/image";
 import * as React from "react";
 
+/**
+ * Simple className merger without extra deps. If you prefer, swap with tailwind-merge + clsx.
+ */
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
+/**
+ * Robust slugify with diacritics removal, punctuation trimming and normalization.
+ */
 function slugify(input: string) {
   return input
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim()
-    .replace(/[\s_]+/g, "-")
-    .replace(/[^\w-]+/g, "")
-    .replace(/-+/g, "-");
+    .replace(/['"()]/g, "")
+    .replace(/[^a-z0-9\s_-]/g, "")
+    .replace(/[\s_-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
+/**
+ * Attempts to flatten a React node to a plain string (used for generating heading anchors).
+ */
 function nodeToString(node: React.ReactNode): string {
+  if (node == null) return "";
   if (typeof node === "string" || typeof node === "number") return String(node);
   if (Array.isArray(node)) return node.map(nodeToString).join("");
   if (React.isValidElement(node)) {
-    const el = node as React.ReactElement<{ children?: React.ReactNode }>; // children may be undefined
+    const el = node as React.ReactElement<{ children?: React.ReactNode }>;
     return nodeToString(el.props?.children);
   }
   return "";
 }
 
+/**
+ * Determines external links (http(s), mailto, tel, protocol-relative).
+ */
+function isExternalHref(href: string) {
+  return (
+    /^https?:\/\//i.test(href) ||
+    href.startsWith("//") ||
+    href.startsWith("mailto:") ||
+    href.startsWith("tel:")
+  );
+}
+
+/**
+ * Headings with auto-generated anchor links and accessible styles.
+ */
 function Heading(level: 1 | 2 | 3 | 4 | 5 | 6) {
   const Tag = `h${level}` as unknown as React.ElementType;
+
+  const base =
+    level === 1
+      ? "mt-2 scroll-mt-28 text-4xl sm:text-5xl font-extrabold tracking-tight leading-tight text-gray-900 dark:text-gray-50"
+      : level === 2
+        ? "mt-16 scroll-mt-28 border-b border-gray-200 dark:border-gray-800 pb-3 text-3xl font-bold tracking-tight leading-tight text-gray-900 dark:text-gray-50 first:mt-0"
+        : level === 3
+          ? "mt-10 scroll-mt-28 text-2xl font-semibold tracking-tight leading-snug text-gray-900 dark:text-gray-100"
+          : level === 4
+            ? "mt-8 scroll-mt-28 text-xl font-semibold tracking-tight leading-snug text-gray-900 dark:text-gray-100"
+            : level === 5
+              ? "mt-8 scroll-mt-28 text-lg font-semibold tracking-tight leading-snug text-gray-900 dark:text-gray-100"
+              : "mt-8 scroll-mt-28 text-base font-semibold tracking-tight leading-snug text-gray-900 dark:text-gray-100";
 
   return function H({
     children,
@@ -36,53 +78,48 @@ function Heading(level: 1 | 2 | 3 | 4 | 5 | 6) {
     ...props
   }: React.HTMLAttributes<HTMLHeadingElement>) {
     const text = nodeToString(children);
-    const anchor = id || slugify(text);
-
-    const base =
-      level === 1
-        ? "mt-2 scroll-mt-28 text-4xl font-bold tracking-tight leading-tight text-gray-900 dark:text-gray-50"
-        : level === 2
-        ? "mt-12 scroll-mt-28 border-b border-gray-200 dark:border-gray-800 pb-3 text-3xl font-semibold tracking-tight leading-tight text-gray-900 dark:text-gray-50 first:mt-0"
-        : level === 3
-        ? "mt-10 scroll-mt-28 text-2xl font-semibold tracking-tight leading-snug text-gray-900 dark:text-gray-100"
-        : level === 4
-        ? "mt-8 scroll-mt-28 text-xl font-semibold tracking-tight leading-snug text-gray-900 dark:text-gray-100"
-        : level === 5
-        ? "mt-8 scroll-mt-28 text-lg font-semibold tracking-tight leading-snug text-gray-900 dark:text-gray-100"
-        : "mt-8 scroll-mt-28 text-base font-semibold tracking-tight leading-snug text-gray-900 dark:text-gray-100";
+    const anchor = id || (text ? slugify(text) : undefined);
 
     return (
       <Tag id={anchor} className={cn(base, className)} {...props}>
-        <a
-          href={`#${anchor}`}
-          className="group inline-block align-baseline"
-          aria-label={text}
-        >
-          {children}
-          <span className="ml-2 text-gray-400 transition-all duration-200 group-hover:opacity-100 opacity-0 dark:text-gray-500">
-            #
-          </span>
-        </a>
+        {anchor ? (
+          <a
+            href={`#${anchor}`}
+            className="group inline-flex items-baseline no-underline"
+            aria-label={text || `Section: ${anchor}`}
+          >
+            {children}
+            <span
+              aria-hidden="true"
+              className="ml-2 inline-block text-gray-400 transition-opacity duration-200 group-hover:opacity-100 opacity-0 dark:text-gray-500"
+            >
+              #
+            </span>
+          </a>
+        ) : (
+          children
+        )}
       </Tag>
     );
   };
 }
 
+/**
+ * Smart link component: internal (Next.js Link), external (target=_blank), hash links, and empty href safety.
+ */
 function A({
   href = "",
   className,
   children,
+  rel,
+  target,
   ...props
 }: React.AnchorHTMLAttributes<HTMLAnchorElement>) {
-  const isExternal =
-    /^https?:\/\//.test(href) ||
-    href.startsWith("mailto:") ||
-    href.startsWith("tel:");
-
   const base =
-    "font-medium text-blue-600 underline decoration-blue-600/30 underline-offset-4 transition-all duration-200 hover:text-blue-700 hover:decoration-blue-700/50 dark:text-blue-400 dark:decoration-blue-400/30 dark:hover:text-blue-300 dark:hover:decoration-blue-300/50";
+    "font-medium text-blue-600 underline decoration-blue-600/30 underline-offset-4 transition-colors duration-200 hover:text-blue-700 hover:decoration-blue-700/50 dark:text-blue-400 dark:decoration-blue-400/30 dark:hover:text-blue-300 dark:hover:decoration-blue-300/50";
 
   if (!href) {
+    // Graceful fallback when href is missing
     return (
       <a className={cn(base, className)} {...props}>
         {children}
@@ -90,13 +127,24 @@ function A({
     );
   }
 
-  if (isExternal) {
+  if (href.startsWith("#")) {
+    // In-page anchor
+    return (
+      <a href={href} className={cn(base, className)} {...props}>
+        {children}
+      </a>
+    );
+  }
+
+  if (isExternalHref(href)) {
+    const finalRel = rel ?? "noopener noreferrer";
+    const finalTarget = target ?? "_blank";
     return (
       <a
         href={href}
         className={cn(base, className)}
-        target="_blank"
-        rel="noopener noreferrer"
+        rel={finalRel}
+        target={finalTarget}
         {...props}
       >
         {children}
@@ -104,6 +152,7 @@ function A({
     );
   }
 
+  // Internal link (Next.js)
   return (
     <Link href={href} className={cn(base, className)} {...(props as any)}>
       {children}
@@ -111,6 +160,9 @@ function A({
   );
 }
 
+/**
+ * Typography primitives
+ */
 function P({
   className,
   ...props
@@ -118,14 +170,109 @@ function P({
   return (
     <p
       className={cn(
-        "leading-relaxed text-base text-gray-700 dark:text-gray-300 [&:not(:first-child)]:mt-6",
-        className
+        "leading-7 text-base text-gray-700 dark:text-gray-300 [&:not(:first-child)]:mt-6",
+        className,
       )}
       {...props}
     />
   );
 }
 
+function Strong(props: React.HTMLAttributes<HTMLElement>) {
+  return (
+    <strong
+      className={cn(
+        "font-semibold text-gray-900 dark:text-gray-100",
+        props.className,
+      )}
+      {...props}
+    />
+  );
+}
+
+function Em(props: React.HTMLAttributes<HTMLElement>) {
+  return <em className={cn("italic", props.className)} {...props} />;
+}
+
+function Mark(props: React.HTMLAttributes<HTMLElement>) {
+  return (
+    <mark
+      className={cn(
+        "rounded-sm bg-yellow-200/60 px-1 py-0.5 text-gray-900 dark:bg-yellow-500/30 dark:text-yellow-50",
+        props.className,
+      )}
+      {...props}
+    />
+  );
+}
+
+function Del(props: React.HTMLAttributes<HTMLElement>) {
+  return (
+    <del
+      className={cn("opacity-80 line-through", props.className)}
+      {...props}
+    />
+  );
+}
+
+function Ins(props: React.HTMLAttributes<HTMLElement>) {
+  return <ins className={cn("no-underline", props.className)} {...props} />;
+}
+
+function Small(props: React.HTMLAttributes<HTMLElement>) {
+  return (
+    <small
+      className={cn(
+        "text-sm text-gray-600 dark:text-gray-400",
+        props.className,
+      )}
+      {...props}
+    />
+  );
+}
+
+function Sup(props: React.HTMLAttributes<HTMLElement>) {
+  return (
+    <sup className={cn("align-super text-xs", props.className)} {...props} />
+  );
+}
+
+function Sub(props: React.HTMLAttributes<HTMLElement>) {
+  return (
+    <sub className={cn("align-sub text-xs", props.className)} {...props} />
+  );
+}
+
+function Blockquote({
+  className,
+  ...props
+}: React.QuoteHTMLAttributes<HTMLQuoteElement>) {
+  return (
+    <blockquote
+      className={cn(
+        "mt-6 border-l-4 border-blue-500/25 dark:border-blue-400/25 bg-blue-50/50 dark:bg-blue-900/10 pl-6 pr-4 py-4 italic text-gray-700 dark:text-gray-400 rounded-r-lg",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+function Hr(props: React.HTMLAttributes<HTMLHRElement>) {
+  return (
+    <hr
+      className={cn(
+        "my-10 border-gray-200 dark:border-gray-800",
+        props.className,
+      )}
+      {...props}
+    />
+  );
+}
+
+/**
+ * Lists
+ */
 function Ul(props: React.HTMLAttributes<HTMLUListElement>) {
   return (
     <ul
@@ -148,49 +295,27 @@ function Li(props: React.LiHTMLAttributes<HTMLLIElement>) {
   return (
     <li
       className={cn(
-        "leading-relaxed text-gray-700 dark:text-gray-300",
-        props.className
+        "leading-relaxed text-gray-700 dark:text-gray-300 marker:text-gray-400 dark:marker:text-gray-500",
+        props.className,
       )}
       {...props}
     />
   );
 }
 
-function Blockquote({
-  className,
-  ...props
-}: React.QuoteHTMLAttributes<HTMLQuoteElement>) {
-  return (
-    <blockquote
-      className={cn(
-        "mt-6 border-l-4 border-blue-500/20 dark:border-blue-400/20 bg-blue-50/50 dark:bg-blue-900/10 pl-6 pr-4 py-4 italic text-gray-700 dark:text-gray-400 rounded-r-lg",
-        className
-      )}
-      {...props}
-    />
-  );
-}
-
-function Hr(props: React.HTMLAttributes<HTMLHRElement>) {
-  return (
-    <hr
-      className={cn(
-        "my-10 border-gray-200 dark:border-gray-800",
-        props.className
-      )}
-      {...props}
-    />
-  );
-}
-
+/**
+ * Code and preformatted blocks
+ * - Inline code: styled chip
+ * - Block code: container styles (syntax highlighting is up to your MDX/rehype setup)
+ */
 function Code({ className, ...props }: React.HTMLAttributes<HTMLElement>) {
   const isInline = !className || !/language-/.test(className);
   if (isInline) {
     return (
       <code
         className={cn(
-          "relative rounded-md bg-gray-100 dark:bg-gray-800 px-1.5 py-1 font-mono text-[0.875em] text-gray-800 dark:text-gray-200",
-          className
+          "relative rounded-md bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 font-mono text-[0.875em] text-gray-800 dark:text-gray-200",
+          className,
         )}
         {...props}
       />
@@ -204,27 +329,37 @@ function Pre({ className, ...props }: React.HTMLAttributes<HTMLPreElement>) {
     <pre
       className={cn(
         "my-8 overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/60 p-5 shadow-sm",
-        className
+        // preserve whitespace for code blocks
+        "whitespace-pre",
+        className,
       )}
       {...props}
     />
   );
 }
 
+/**
+ * Tables
+ * - Responsive wrapper
+ * - Sticky header
+ * - Zebra striping and subtle borders
+ * - Accessible captions
+ */
+// Replace your table components with these
+
 function Table({
   className,
   ...props
 }: React.TableHTMLAttributes<HTMLTableElement>) {
-  // Wrapper provides border, radius, shadow and horizontal scrolling
   return (
-    <div className="my-8 w-full overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
+    <div className="my-8 w-full overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
       <table
         {...props}
         className={cn(
-          // separate + spacing-0 lets us round header corners cleanly
-          "w-full border-separate border-spacing-0 table-auto",
+          // Use collapsed borders for continuous grid lines
+          "w-full border-collapse table-auto",
           "text-sm leading-6",
-          className
+          className,
         )}
       />
     </div>
@@ -235,26 +370,13 @@ function THead(props: React.HTMLAttributes<HTMLTableSectionElement>) {
   return (
     <thead
       {...props}
-      className={cn(
-        // distinct header background
-        "bg-gray-50 dark:bg-gray-900/50",
-        props.className
-      )}
+      className={cn("bg-gray-50 dark:bg-gray-900/60", props.className)}
     />
   );
 }
 
 function TBody(props: React.HTMLAttributes<HTMLTableSectionElement>) {
-  return (
-    <tbody
-      {...props}
-      className={cn(
-        // zebra stripes only for body rows
-        "odd:[&_tr]:bg-white even:[&_tr]:bg-gray-50/60 dark:odd:[&_tr]:bg-transparent dark:even:[&_tr]:bg-gray-900/30",
-        props.className
-      )}
-    />
-  );
+  return <tbody {...props} className={cn("", props.className)} />;
 }
 
 function Tr(props: React.HTMLAttributes<HTMLTableRowElement>) {
@@ -262,11 +384,12 @@ function Tr(props: React.HTMLAttributes<HTMLTableRowElement>) {
     <tr
       {...props}
       className={cn(
-        // subtle hover across rows
+        // subtle hover
         "transition-colors duration-150 hover:bg-gray-50 dark:hover:bg-gray-900/40",
-        // row dividers (bottom border)
-        "border-b border-gray-200 dark:border-gray-800 last:border-0",
-        props.className
+        // zebra striping
+        "even:bg-gray-50/60 dark:even:bg-gray-900/30",
+        // no row borders (we use cell borders)
+        props.className,
       )}
     />
   );
@@ -277,22 +400,17 @@ function Th(props: React.ThHTMLAttributes<HTMLTableCellElement>) {
     <th
       {...props}
       className={cn(
-        // spacing
-        "px-6 py-3",
-        // alignment/typography
+        "px-4 py-2",
         "text-left text-xs font-semibold uppercase tracking-wide",
         "text-gray-700 dark:text-gray-300",
-        // header bottom border
-        "border-b border-gray-200 dark:border-gray-800",
-        // rounded header corners (first/last th)
-        "first:rounded-tl-xl last:rounded-tr-xl",
-        // keep header above body on scroll inside container
-        "sticky top-0 z-10",
-        // ensure sticky header keeps its background
-        "bg-gray-50 dark:bg-gray-900/50",
-        // prevent awkward wrapping for short headers
+        // sticky header; include webkit alias for Safari
+        "sticky top-0 z-10 [position:-webkit-sticky]",
+        // ensure header visually sits above body and keeps background
+        "bg-gray-50 dark:bg-gray-900/60",
+        // cell borders for a continuous grid
+        "border border-gray-200 dark:border-gray-800",
         "whitespace-nowrap",
-        props.className
+        props.className,
       )}
       scope={props.scope ?? "col"}
     />
@@ -304,91 +422,37 @@ function Td(props: React.TdHTMLAttributes<HTMLTableCellElement>) {
     <td
       {...props}
       className={cn(
-        // spacing
-        "px-6 py-4",
-        // content alignment and typography
+        "px-4 py-3",
         "align-top text-gray-700 dark:text-gray-300",
-        // wrap long content nicely
         "whitespace-normal break-words",
-        // subtle row borders
-        "border-b border-gray-200 dark:border-gray-800 last:border-0",
-        props.className
+        // cell borders for a continuous grid
+        "border border-gray-200 dark:border-gray-800",
+        props.className,
       )}
     />
   );
 }
 
-// Optional: if you use <caption>, this styles it nicely
 function Caption(props: React.HTMLAttributes<HTMLTableCaptionElement>) {
   return (
     <caption
       {...props}
       className={cn(
         "caption-bottom mt-3 text-sm text-gray-500 dark:text-gray-400",
-        props.className
+        props.className,
       )}
     />
   );
 }
-
-function Strong(props: React.HTMLAttributes<HTMLElement>) {
-  return (
-    <strong
-      className={cn(
-        "font-semibold text-gray-900 dark:text-gray-100",
-        props.className
-      )}
-      {...props}
-    />
-  );
-}
-
-function Em(props: React.HTMLAttributes<HTMLElement>) {
-  return <em className={cn("italic", props.className)} {...props} />;
-}
-
-function Kbd(props: React.HTMLAttributes<HTMLElement>) {
-  return (
-    <kbd
-      className={cn(
-        "inline-flex items-center rounded-md border border-gray-300 dark:border-gray-600 bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 px-2 py-1 font-mono text-xs font-medium shadow-sm text-gray-800 dark:text-gray-200",
-        props.className
-      )}
-      {...props}
-    />
-  );
-}
-
-function Details(props: React.DetailsHTMLAttributes<HTMLDetailsElement>) {
-  return (
-    <details
-      className={cn(
-        "my-6 rounded-xl border border-gray-200 dark:border-gray-800 p-5 transition-all duration-200 open:bg-gray-50 dark:open:bg-gray-900/30 open:shadow-sm",
-        props.className
-      )}
-      {...props}
-    />
-  );
-}
-
-// FIX: Summary uses generic HTMLAttributes — SummaryHTMLAttributes does not exist in React types
-function Summary(props: React.HTMLAttributes<HTMLElement>) {
-  return (
-    <summary
-      className={cn(
-        "cursor-pointer font-medium text-gray-900 dark:text-gray-100 hover:text-gray-700 dark:hover:text-gray-300 transition-colors duration-200 select-none",
-        props.className
-      )}
-      {...props}
-    />
-  );
-}
-
+/**
+ * Media
+ */
 function Img(props: React.ImgHTMLAttributes<HTMLImageElement>) {
   const { src = "", alt = "", width, height, className, ...rest } = props;
   const w = typeof width === "string" ? parseInt(width, 10) : width;
   const h = typeof height === "string" ? parseInt(height, 10) : height;
 
+  // If explicit dimensions provided, prefer Next/Image for performance
   if (src && w && h) {
     return (
       <Image
@@ -398,7 +462,8 @@ function Img(props: React.ImgHTMLAttributes<HTMLImageElement>) {
         height={h}
         className={cn(
           "my-8 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/30 shadow-sm",
-          className
+          "max-w-full h-auto",
+          className,
         )}
         {...(rest as any)}
       />
@@ -413,16 +478,194 @@ function Img(props: React.ImgHTMLAttributes<HTMLImageElement>) {
       alt={alt}
       loading="lazy"
       className={cn(
-        "my-8 max-w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/30 shadow-sm",
-        className
+        "my-8 max-w-full h-auto rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/30 shadow-sm",
+        className,
       )}
       {...rest}
     />
   );
 }
 
+function Figure(props: React.HTMLAttributes<HTMLElement>) {
+  return (
+    <figure
+      className={cn(
+        "my-8 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-900/30 p-3",
+        props.className,
+      )}
+      {...props}
+    />
+  );
+}
+
+function Figcaption(props: React.HTMLAttributes<HTMLElement>) {
+  return (
+    <figcaption
+      className={cn(
+        "mt-3 text-center text-sm text-gray-600 dark:text-gray-400",
+        props.className,
+      )}
+      {...props}
+    />
+  );
+}
+
+function Video({
+  className,
+  controls = true,
+  ...props
+}: React.VideoHTMLAttributes<HTMLVideoElement>) {
+  return (
+    <video
+      className={cn(
+        "my-8 w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-black",
+        className,
+      )}
+      controls={controls}
+      preload="metadata"
+      {...props}
+    />
+  );
+}
+
+function Iframe({
+  className,
+  allowFullScreen = true,
+  loading = "lazy",
+  referrerPolicy = "no-referrer",
+  ...props
+}: React.IframeHTMLAttributes<HTMLIFrameElement>) {
+  return (
+    <iframe
+      className={cn(
+        "my-8 w-full aspect-video rounded-xl border border-gray-200 dark:border-gray-800",
+        className,
+      )}
+      allowFullScreen={allowFullScreen}
+      loading={loading}
+      referrerPolicy={referrerPolicy}
+      {...props}
+    />
+  );
+}
+
+/**
+ * Misc
+ */
+function Kbd(props: React.HTMLAttributes<HTMLElement>) {
+  return (
+    <kbd
+      className={cn(
+        "inline-flex items-center rounded-md border border-gray-300 dark:border-gray-600 bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 px-2 py-1 font-mono text-xs font-medium shadow-sm text-gray-800 dark:text-gray-200",
+        props.className,
+      )}
+      {...props}
+    />
+  );
+}
+
+function Details(props: React.DetailsHTMLAttributes<HTMLDetailsElement>) {
+  return (
+    <details
+      className={cn(
+        "my-6 rounded-xl border border-gray-200 dark:border-gray-800 p-5 transition-all duration-200 open:bg-gray-50 dark:open:bg-gray-900/30 open:shadow-sm",
+        props.className,
+      )}
+      {...props}
+    />
+  );
+}
+
+function Summary(props: React.HTMLAttributes<HTMLElement>) {
+  return (
+    <summary
+      className={cn(
+        "cursor-pointer font-medium text-gray-900 dark:text-gray-100 hover:text-gray-700 dark:hover:text-gray-300 transition-colors duration-200 select-none",
+        // Hide default triangle in some browsers if you want a cleaner look:
+        // "marker:hidden [&::-webkit-details-marker]:hidden",
+        props.className,
+      )}
+      {...props}
+    />
+  );
+}
+
+/**
+ - You can also use this Callout component in MDX: <Callout type="info">...</Callout>
+ */
+type CalloutType = "info" | "success" | "warning" | "danger" | "note";
+
+function Callout({
+  type = "info",
+  title,
+  children,
+  className,
+  ...props
+}: {
+  type?: CalloutType;
+  title?: React.ReactNode;
+} & React.HTMLAttributes<HTMLDivElement>) {
+  const styles: Record<
+    CalloutType,
+    { border: string; bg: string; text: string; title: string }
+  > = {
+    info: {
+      border: "border-blue-500/30",
+      bg: "bg-blue-50/60 dark:bg-blue-900/20",
+      text: "text-blue-900 dark:text-blue-100",
+      title: "text-blue-900 dark:text-blue-100",
+    },
+    success: {
+      border: "border-emerald-500/30",
+      bg: "bg-emerald-50/60 dark:bg-emerald-900/20",
+      text: "text-emerald-900 dark:text-emerald-100",
+      title: "text-emerald-900 dark:text-emerald-100",
+    },
+    warning: {
+      border: "border-amber-500/30",
+      bg: "bg-amber-50/60 dark:bg-amber-900/20",
+      text: "text-amber-900 dark:text-amber-100",
+      title: "text-amber-900 dark:text-amber-100",
+    },
+    danger: {
+      border: "border-red-500/30",
+      bg: "bg-red-50/60 dark:bg-red-900/20",
+      text: "text-red-900 dark:text-red-100",
+      title: "text-red-900 dark:text-red-100",
+    },
+    note: {
+      border: "border-gray-400/30",
+      bg: "bg-gray-50/60 dark:bg-gray-900/30",
+      text: "text-gray-800 dark:text-gray-100",
+      title: "text-gray-900 dark:text-gray-100",
+    },
+  };
+
+  const s = styles[type];
+
+  return (
+    <div
+      className={cn(
+        "my-6 rounded-xl border p-5 shadow-sm",
+        s.border,
+        s.bg,
+        className,
+      )}
+      {...props}
+    >
+      {title ? (
+        <div className={cn("mb-2 font-semibold", s.title)}>{title}</div>
+      ) : null}
+      <div className={cn("text-sm leading-6", s.text)}>{children}</div>
+    </div>
+  );
+}
+
+/**
+ * Base components mapping for MDX
+ */
 const baseComponents: MDXComponents = {
-  // Headings with anchor links
+  // Headings with anchored links
   h1: Heading(1),
   h2: Heading(2),
   h3: Heading(3),
@@ -434,6 +677,12 @@ const baseComponents: MDXComponents = {
   p: P,
   strong: Strong,
   em: Em,
+  mark: Mark,
+  del: Del,
+  ins: Ins,
+  small: Small,
+  sup: Sup,
+  sub: Sub,
   blockquote: Blockquote,
   hr: Hr,
 
@@ -445,6 +694,10 @@ const baseComponents: MDXComponents = {
   // Links and media
   a: A,
   img: Img,
+  figure: Figure,
+  figcaption: Figcaption,
+  video: Video,
+  iframe: Iframe,
 
   // Code
   pre: Pre,
@@ -463,11 +716,16 @@ const baseComponents: MDXComponents = {
   kbd: Kbd,
   details: Details,
   summary: Summary,
+
+  // Custom MDX components (use as <Callout type="info">...</Callout>)
+  Callout,
 };
 
-// Merge with any components passed from MDXProvider (if you use one)
+/**
+ * Merge with any components passed from MDXProvider or next-mdx-remote
+ */
 export function useMDXComponents(
-  components: MDXComponents = {}
+  components: MDXComponents = {},
 ): MDXComponents {
   return {
     ...baseComponents,

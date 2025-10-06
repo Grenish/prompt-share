@@ -21,7 +21,7 @@ export default function SignupPage() {
           <div className="w-full max-w-xs">
             <SignupForm />
           </div>
-          <div className="absolute inset-0 bg-primary/20 backdrop-blur-lg z-10 rounded-xl border p-6">
+          {/*<div className="absolute inset-0 bg-primary/20 backdrop-blur-lg z-10 rounded-xl border p-6">
             <div className="flex h-full flex-col items-center justify-center text-center space-y-5">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -62,7 +62,7 @@ export default function SignupPage() {
                 </Link>
               </div>
             </div>
-          </div>
+          </div>*/}
         </div>
       </div>
     </div>
