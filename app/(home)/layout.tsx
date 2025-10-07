@@ -1,4 +1,6 @@
 import Navbar from "@/components/navbar";
+import { ToastHandler } from "@/components/toast-handler";
+import { Suspense } from "react";
 
 export default function HomeLayout({
   children,
@@ -8,6 +10,9 @@ export default function HomeLayout({
   return (
     <main>
       <Navbar />
+      <Suspense>
+        <ToastHandler />
+      </Suspense>
       {children}
     </main>
   );

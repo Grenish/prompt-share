@@ -5,6 +5,7 @@ import type {
   MobilePost,
   MobilePostComment,
 } from "@/components/post/mobile-post-view";
+import type { Metadata } from "next";
 
 type PageProps = {
   params: Promise<{ postId: string }>;
@@ -40,6 +41,84 @@ type ProfileRow = {
   full_name: string | null;
   avatar_url: string | null;
 };
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { postId } = await params;
+  const supabase = await createClient();
+
+  const { data: postRow } = await supabase
+    .from("posts")
+    .select("id, text, model_name, author, media_urls")
+    .eq("id", postId)
+    .single();
+
+  if (!postRow) {
+    return {
+      title: "Post Not Found",
+      description: "This post could not be found.",
+    };
+  }
+
+  let authorName = "AI Cookbook User";
+  if (postRow.author) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("username, full_name")
+      .eq("id", postRow.author)
+      .maybeSingle();
+    
+    if (profile) {
+      authorName = profile.full_name || profile.username || authorName;
+    }
+  }
+
+  const postText = postRow.text?.trim() || "View this AI prompt on AI Cookbook";
+  const title = postText.length > 60 ? postText.slice(0, 60) + "..." : postText;
+  const description = `${postText.slice(0, 160)}${postText.length > 160 ? "..." : ""} - Shared by ${authorName}`;
+  const modelInfo = postRow.model_name ? ` for ${postRow.model_name}` : "";
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://aicookbook.vercel.app";
+  const ogImageUrl = `/api/og?type=post&title=${encodeURIComponent(title)}&description=${encodeURIComponent(`By ${authorName}${modelInfo}`)}`;
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "article",
+      url: `${siteUrl}/home/posts/${postId}`,
+      images: [
+        {
+          url: ogImageUrl,
+          width: 1200,
+          height: 630,
+          alt: title,
+        },
+      ],
+      ...(postRow.media_urls && postRow.media_urls.length > 0 && {
+        images: [
+          {
+            url: ogImageUrl,
+            width: 1200,
+            height: 630,
+            alt: title,
+          },
+          ...postRow.media_urls.slice(0, 3).map((url: string) => ({
+            url,
+            alt: title,
+          })),
+        ],
+      }),
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [ogImageUrl],
+    },
+  };
+}
 
 export default async function PostPage({ params }: PageProps) {
   const { postId } = await params;
