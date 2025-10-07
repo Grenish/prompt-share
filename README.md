@@ -54,13 +54,30 @@ To get a local copy up and running, follow these simple steps.
     ```env
     NEXT_PUBLIC_SUPABASE_URL="YOUR_SUPABASE_URL"
     NEXT_PUBLIC_SUPABASE_ANON_KEY="YOUR_SUPABASE_ANON_KEY"
+    NEXT_PUBLIC_SITE_URL="http://localhost:3000"  # For development
     ```
+
+    See `.env.example` for reference.
 
 4.  **Run the development server**
 
     ```sh
     npm run dev
     ```
+
+5.  **Access the application**
+
+    Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+## 🎨 SEO & Open Graph Images
+
+AI Cookbook includes comprehensive SEO optimization with auto-generated Open Graph images for better social media sharing:
+
+- **Dynamic OG Images**: Automatically generated for posts, profiles, and tags
+- **SEO Metadata**: Optimized titles, descriptions, and keywords for each page
+- **Sitemap**: Auto-generated and updated hourly
+- **Structured Data**: JSON-LD schema for better search engine understanding
+
 
 ## 📂 Project Structure
 
