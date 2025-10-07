@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import Script from "next/script";
+import { Toaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
   title: "AI Cookbook",
@@ -59,6 +60,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           {children}
+          <Toaster />
         </ThemeProvider>
         <Script
           src="https://scripts.simpleanalyticscdn.com/latest.js"
