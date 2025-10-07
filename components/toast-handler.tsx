@@ -13,7 +13,8 @@ export function ToastHandler() {
 
     if (toastType === "verify_email") {
       toast("Check your email", {
-        description: "We've sent a verification link to your email. If you don't see it, please check your spam or junk folder.",
+        description:
+          "We've sent a verification link to your email. If you don't see it, please check your spam or junk folder.",
       });
     } else if (toastType === "signup_success") {
       toast("Welcome!", {
