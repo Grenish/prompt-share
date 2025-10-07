@@ -86,7 +86,7 @@ export function SignupForm({
             </span>
           </div>
           <div className="space-y-4">
-            <Button variant="outline" type="button" className="w-full">
+            <Button variant="outline" type="button" className="w-full" disabled>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="32"
@@ -98,7 +98,7 @@ export function SignupForm({
               </svg>
               Continue with Github
             </Button>
-            <Button variant="outline" type="button" className="w-full">
+            <Button variant="outline" type="button" className="w-full" disabled>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="32"
