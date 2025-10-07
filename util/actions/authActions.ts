@@ -121,6 +121,37 @@ export async function loginAction(
   redirect("/home");
 }
 
+export type SignupState = { ok: boolean; error?: string | null };
+export async function signupAction(
+  _prev: SignupState,
+  formData: FormData
+): Promise<SignupState> {
+  const parsed = SignupSchema.safeParse({
+    email: formData.get("email"),
+    password: formData.get("password"),
+    name: formData.get("name"),
+  });
+
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: "Please fill in all fields correctly.",
+    };
+  }
+
+  const { email, password, name } = parsed.data;
+  const res = await doSignup(email, password, name);
+  if (!res.ok) {
+    return { ok: false, error: res.error };
+  }
+
+  revalidatePath("/", "layout");
+  
+  // message will be either "verify_email" or "signup_success"
+  const toastKey = res.message || "signup_success";
+  redirectWithToast("/", toastKey);
+}
+
 export async function signup(formData: FormData) {
   const parsed = SignupSchema.safeParse({
     email: formData.get("email"),
