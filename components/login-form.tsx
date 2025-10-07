@@ -16,7 +16,7 @@ export function LoginForm({
 }: React.ComponentProps<"div">) {
   const [state, formAction, pending] = useActionState<LoginState, FormData>(
     loginAction,
-    { ok: false },
+    { ok: false }
   );
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
@@ -55,13 +55,21 @@ export function LoginForm({
             </div>
             <div className="grid gap-3">
               <Label htmlFor="password">Password</Label>
-              <Input
-                name="password"
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                required
-              />
+              <div className="">
+                <Input
+                  name="password"
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  required
+                />
+                <Link
+                  href="/forgot-password"
+                  className="mt-2 block text-sm underline underline-offset-4"
+                >
+                  Forgot password?
+                </Link>
+              </div>
             </div>
             <Button type="submit" className="w-full" disabled={pending}>
               {pending ? "Logging in…" : "Login"}
