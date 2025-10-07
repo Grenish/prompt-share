@@ -1,18 +1,25 @@
+"use client";
+
 import { Book } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
-import { signup } from "@/util/actions/authActions";
+import { signupAction, type SignupState } from "@/util/actions/authActions";
+import { useActionState } from "react";
 
 export function SignupForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
+  const [state, formAction, pending] = useActionState<SignupState, FormData>(
+    signupAction,
+    { ok: false },
+  );
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <form>
+      <form action={formAction}>
         <div className="flex flex-col gap-6">
           <div className="flex flex-col items-center gap-2">
             <a
@@ -64,9 +71,14 @@ export function SignupForm({
                 required
               />
             </div>
-            <Button type="submit" className="w-full" formAction={signup}>
-              Sign Up
+            <Button type="submit" className="w-full" disabled={pending}>
+              {pending ? "Signing up…" : "Sign Up"}
             </Button>
+            {state?.error ? (
+              <p className="text-sm text-destructive" role="alert">
+                {state.error}
+              </p>
+            ) : null}
           </div>
           <div className="after:border-border relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t">
             <span className="bg-background text-muted-foreground relative z-10 px-2">
