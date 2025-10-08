@@ -121,7 +121,11 @@ export async function loginAction(
   redirect("/home");
 }
 
-export type SignupState = { ok: boolean; error?: string | null };
+export type SignupState = {
+  ok: boolean;
+  error?: string | null;
+  message?: string | null;
+};
 export async function signupAction(
   _prev: SignupState,
   formData: FormData
@@ -145,11 +149,10 @@ export async function signupAction(
     return { ok: false, error: res.error };
   }
 
-  revalidatePath("/", "layout");
-  
-  // message will be either "verify_email" or "signup_success"
-  const toastKey = res.message || "signup_success";
-  redirectWithToast("/", toastKey);
+  return {
+    ok: true,
+    message: res.message || "signup_success",
+  };
 }
 
 export async function signup(formData: FormData) {
