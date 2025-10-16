@@ -3,7 +3,19 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import Script from "next/script";
 
+// Determine the base URL based on environment
+const getBaseUrl = () => {
+  if (typeof window !== "undefined") {
+    return window.location.origin;
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  return process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+};
+
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
   title: "AI Cookbook",
   description:
     "AI Cookbook is your go-to library for powerful AI prompts. Share your own, explore curated prompts, and unlock creativity with ChatGPT, Gemini, MidJourney, and more.",
@@ -22,16 +34,8 @@ export const metadata: Metadata = {
     title: "AI Cookbook",
     description:
       "Browse, share, and discover curated AI prompts for ChatGPT, Gemini, MidJourney, and other AI tools. Unlock new ways to boost creativity and productivity.",
-    url: "http://localhost:3000",
     siteName: "AI Cookbook",
-    images: [
-      {
-        url: "https://yourdomain.com/og-image.png",
-        width: 1200,
-        height: 630,
-        alt: "AI Cookbook - Share & Discover AI Prompts",
-      },
-    ],
+    images: ["/opengraph-image.png"],
     locale: "en_US",
     type: "website",
   },
@@ -40,7 +44,7 @@ export const metadata: Metadata = {
     title: "AI Cookbook - Share & Discover the Best AI Prompts",
     description:
       "AI Cookbook is a community-driven library of AI prompts for ChatGPT, Gemini, MidJourney, and more. Share your own prompts and discover new ideas.",
-    images: ["https://yourdomain.com/og-image.png"],
+    images: ["/opengraph-image.png"],
   },
 };
 
