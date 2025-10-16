@@ -16,6 +16,8 @@ export default function Image() {
       <div
         style={{
           ...baseContainerStyle,
+          display: 'flex',
+          flexDirection: 'column',
           justifyContent: 'space-between',
           backgroundImage: `
             radial-gradient(circle at 30% 70%, rgba(173, 216, 230, 0.35), transparent 60%),
@@ -61,26 +63,61 @@ export default function Image() {
               marginTop: '20px',
             }}
           >
-            {['ChatGPT', 'Gemini', 'Claude', 'MidJourney'].map((model) => (
-              <div
-                key={model}
-                style={{
-                  padding: '12px 24px',
-                  backgroundColor: OG_COLORS.primary,
-                  color: OG_COLORS.background,
-                  borderRadius: '24px',
-                  fontSize: 18,
-                  fontWeight: 600,
-                }}
-              >
-                {model}
-              </div>
-            ))}
+            <div
+              style={{
+                padding: '12px 24px',
+                backgroundColor: OG_COLORS.primary,
+                color: OG_COLORS.background,
+                borderRadius: '24px',
+                fontSize: 18,
+                fontWeight: 600,
+              }}
+            >
+              ChatGPT
+            </div>
+            <div
+              style={{
+                padding: '12px 24px',
+                backgroundColor: OG_COLORS.primary,
+                color: OG_COLORS.background,
+                borderRadius: '24px',
+                fontSize: 18,
+                fontWeight: 600,
+              }}
+            >
+              Gemini
+            </div>
+            <div
+              style={{
+                padding: '12px 24px',
+                backgroundColor: OG_COLORS.primary,
+                color: OG_COLORS.background,
+                borderRadius: '24px',
+                fontSize: 18,
+                fontWeight: 600,
+              }}
+            >
+              Claude
+            </div>
+            <div
+              style={{
+                padding: '12px 24px',
+                backgroundColor: OG_COLORS.primary,
+                color: OG_COLORS.background,
+                borderRadius: '24px',
+                fontSize: 18,
+                fontWeight: 600,
+              }}
+            >
+              MidJourney
+            </div>
           </div>
         </div>
 
         <div
           style={{
+            display: 'flex',
+            alignItems: 'center',
             paddingTop: '30px',
             borderTop: `2px solid ${OG_COLORS.primary}`,
             fontSize: 16,

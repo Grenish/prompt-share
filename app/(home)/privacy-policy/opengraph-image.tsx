@@ -16,6 +16,8 @@ export default function Image() {
       <div
         style={{
           ...baseContainerStyle,
+          display: 'flex',
+          flexDirection: 'column',
           justifyContent: 'center',
           alignItems: 'center',
           textAlign: 'center',

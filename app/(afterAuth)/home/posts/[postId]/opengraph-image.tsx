@@ -91,6 +91,8 @@ export default async function Image({
         <div
           style={{
             ...baseContainerStyle,
+            display: 'flex',
+            flexDirection: 'column',
             justifyContent: 'space-between',
             backgroundImage: `
               radial-gradient(circle at 30% 70%, rgba(173, 216, 230, 0.35), transparent 60%),

@@ -16,6 +16,8 @@ export default function Image() {
       <div
         style={{
           ...baseContainerStyle,
+          display: 'flex',
+          flexDirection: 'column',
           justifyContent: 'space-between',
           backgroundImage: `
             radial-gradient(circle at 30% 70%, rgba(173, 216, 230, 0.35), transparent 60%),
@@ -61,26 +63,85 @@ export default function Image() {
               marginTop: '20px',
             }}
           >
-            {['Writing', 'Coding', 'Art', 'Marketing', 'Education', 'Business'].map((tag, idx) => (
-              <div
-                key={tag}
-                style={{
-                  padding: '12px 24px',
-                  backgroundColor: idx % 2 === 0 ? OG_COLORS.primary : OG_COLORS.accent,
-                  color: OG_COLORS.background,
-                  borderRadius: '24px',
-                  fontSize: 18,
-                  fontWeight: 600,
-                }}
-              >
-                #{tag}
-              </div>
-            ))}
+            <div
+              style={{
+                padding: '12px 24px',
+                backgroundColor: OG_COLORS.primary,
+                color: OG_COLORS.background,
+                borderRadius: '24px',
+                fontSize: 18,
+                fontWeight: 600,
+              }}
+            >
+              #Writing
+            </div>
+            <div
+              style={{
+                padding: '12px 24px',
+                backgroundColor: OG_COLORS.accent,
+                color: OG_COLORS.background,
+                borderRadius: '24px',
+                fontSize: 18,
+                fontWeight: 600,
+              }}
+            >
+              #Coding
+            </div>
+            <div
+              style={{
+                padding: '12px 24px',
+                backgroundColor: OG_COLORS.primary,
+                color: OG_COLORS.background,
+                borderRadius: '24px',
+                fontSize: 18,
+                fontWeight: 600,
+              }}
+            >
+              #Art
+            </div>
+            <div
+              style={{
+                padding: '12px 24px',
+                backgroundColor: OG_COLORS.accent,
+                color: OG_COLORS.background,
+                borderRadius: '24px',
+                fontSize: 18,
+                fontWeight: 600,
+              }}
+            >
+              #Marketing
+            </div>
+            <div
+              style={{
+                padding: '12px 24px',
+                backgroundColor: OG_COLORS.primary,
+                color: OG_COLORS.background,
+                borderRadius: '24px',
+                fontSize: 18,
+                fontWeight: 600,
+              }}
+            >
+              #Education
+            </div>
+            <div
+              style={{
+                padding: '12px 24px',
+                backgroundColor: OG_COLORS.accent,
+                color: OG_COLORS.background,
+                borderRadius: '24px',
+                fontSize: 18,
+                fontWeight: 600,
+              }}
+            >
+              #Business
+            </div>
           </div>
         </div>
 
         <div
           style={{
+            display: 'flex',
+            alignItems: 'center',
             paddingTop: '30px',
             borderTop: `2px solid ${OG_COLORS.primary}`,
             fontSize: 16,

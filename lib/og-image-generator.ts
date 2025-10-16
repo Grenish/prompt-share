@@ -30,11 +30,12 @@ export const OG_FONTS = {
 
 /**
  * Base styles for OG images
+ * IMPORTANT: Satori requires explicit display property on all flex containers
  */
 export const baseContainerStyle = {
   width: '100%',
   height: '100%',
-  display: 'flex',
+  display: 'flex' as const,
   flexDirection: 'column' as const,
   padding: '60px',
   background: OG_COLORS.background,
