@@ -41,15 +41,19 @@ export async function updateSession(request: NextRequest) {
 
   const publicRoutes = ["/", "/terms-and-conditions", "/privacy-policy", "/waitlist"];
 
-  // Public routes that should be accessible without authentication
-  const isPublicRoute =
+  // Routes that should be accessible without authentication (browsable)
+  const isBrowsableRoute =
     publicRoutes.includes(request.nextUrl.pathname) ||
     request.nextUrl.pathname.startsWith("/login") ||
     request.nextUrl.pathname.startsWith("/signup") ||
     request.nextUrl.pathname.startsWith("/auth") ||
-    request.nextUrl.pathname.startsWith("/error");
+    request.nextUrl.pathname.startsWith("/error") ||
+    // Public home routes - users can browse these without authentication
+    request.nextUrl.pathname.startsWith("/home/explore") ||
+    request.nextUrl.pathname.startsWith("/home/posts") ||
+    request.nextUrl.pathname.startsWith("/home/profile");
 
-  if (!user && !isPublicRoute) {
+  if (!user && !isBrowsableRoute) {
     // no user, potentially respond by redirecting the user to the login page
     const url = request.nextUrl.clone();
     url.pathname = "/login";
