@@ -1,13 +1,23 @@
 "use client";
 
 import { Book } from "lucide-react";
-import { cn } from "@/lib/utils";
+import Link from "next/link";
+import { useActionState, useEffect, useRef, useState } from "react";
+
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import Link from "next/link";
+import { cn } from "@/lib/utils";
 import { signupAction, type SignupState } from "@/util/actions/authActions";
-import { useActionState } from "react";
 
 export function SignupForm({
   className,
@@ -17,9 +27,32 @@ export function SignupForm({
     signupAction,
     { ok: false },
   );
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    if (state?.ok) {
+      setDialogOpen(true);
+      formRef.current?.reset();
+    }
+  }, [state?.ok]);
+
+  const dialogCopy =
+    state?.message === "verify_email"
+      ? {
+          title: "Check your inbox",
+          description:
+            "We've sent a verification link to your email. Please confirm to finish creating your account.",
+        }
+      : {
+          title: "Account created",
+          description:
+            "Your account is ready to go. You can sign in whenever you're ready.",
+        };
+
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <form action={formAction}>
+      <form action={formAction} ref={formRef}>
         <div className="flex flex-col gap-6">
           <div className="flex flex-col items-center gap-2">
             <a
@@ -117,6 +150,21 @@ export function SignupForm({
         By signing up, you agree to our <a href="#">Terms of Service</a> and{" "}
         <a href="#">Privacy Policy</a>.
       </div>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{dialogCopy.title}</DialogTitle>
+            <DialogDescription>{dialogCopy.description}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" className="w-full sm:w-auto">
+                Got it
+              </Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
