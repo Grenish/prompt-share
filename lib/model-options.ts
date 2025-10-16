@@ -66,6 +66,10 @@ export const MODELS_BY_PROVIDER: Record<string, ModelInfo[]> = {
       kind: "image",
     },
     { key: "veo-3", label: "Veo 3", kind: "video" },
+    { key: "imagen-3", label: "Imagen 3", kind: "image" },
+    { key: "imagen-4", label: "Imagen 4", kind: "image" },
+    { key: "imagen-4-fast", label: "Imagen 4 Fast", kind: "image" },
+    { key: "imagen-4-ultra", label: "Imagen 4 Ultra", kind: "image" },
     { key: "other", label: "Other (custom)", kind: "custom" },
   ],
   meta: [
