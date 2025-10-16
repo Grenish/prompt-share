@@ -38,9 +38,13 @@ const navItems = [
 export async function AppSidebar() {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getUser();
+  
+  // If user is not authenticated, return null (sidebar won't render)
+  // This is fine for public routes like /home/explore and /home/profile
   if (error || !data.user) {
-    throw new Error("User not authenticated");
+    return null;
   }
+  
   const user = normalizeUser(data.user);
 
   return (
