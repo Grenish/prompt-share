@@ -103,8 +103,10 @@ export async function signup(formData: FormData) {
     return redirect("/error");
   }
 
+  // Redirect to confirmation page instead of directly to home
+  // User needs to confirm their email first
   revalidatePath("/", "layout");
-  redirect("/");
+  redirect("/auth/confirm-email");
 }
 
 export async function logout() {
