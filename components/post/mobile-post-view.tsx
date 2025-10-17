@@ -11,6 +11,7 @@ import {
   createPostComment,
   type PostCommentPayload,
 } from "@/util/actions/postsActions";
+import { isNotAuthenticatedError, navigateToLogin } from "@/util/auth/client-auth";
 import { toast } from "sonner";
 import {
   Bookmark,
@@ -612,7 +613,14 @@ export function MobilePostView({ post }: { post: MobilePost }) {
     setLikesCount((prev) => Math.max(0, prev + (next ? 1 : -1)));
     try {
       const res = await togglePostLike(post.id, next);
-      if (!res.ok) throw new Error(res.error ?? "Couldn't update like");
+      if (!res.ok) {
+        // Check if user needs to authenticate
+        if (isNotAuthenticatedError(res.error)) {
+          navigateToLogin();
+          return;
+        }
+        throw new Error(res.error ?? "Couldn't update like");
+      }
       if (typeof res.likes === "number") {
         setLikesCount(res.likes);
       }
@@ -628,7 +636,14 @@ export function MobilePostView({ post }: { post: MobilePost }) {
     setSaved(next);
     try {
       const res = await togglePostSave(post.id, next);
-      if (!res.ok) throw new Error(res.error ?? "Couldn't update save");
+      if (!res.ok) {
+        // Check if user needs to authenticate
+        if (isNotAuthenticatedError(res.error)) {
+          navigateToLogin();
+          return;
+        }
+        throw new Error(res.error ?? "Couldn't update save");
+      }
       if (typeof res.saved === "boolean") setSaved(res.saved);
     } catch (error) {
       setSaved(!next);

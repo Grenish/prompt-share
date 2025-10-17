@@ -6,12 +6,20 @@ import { Toaster } from "@/components/ui/sonner";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://aicookbook.vercel.app";
 
+// Determine the base URL based on environment
+const getBaseUrl = () => {
+  if (typeof window !== "undefined") {
+    return window.location.origin;
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  return process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+};
+
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
-  title: {
-    default: "AI Cookbook - Share & Discover AI Prompts",
-    template: "%s | AI Cookbook",
-  },
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
+  title: "AI Cookbook",
   description:
     "AI Cookbook is your go-to library for powerful AI prompts. Share your own, explore curated prompts, and unlock creativity with ChatGPT, Gemini, MidJourney, and more.",
   keywords: [
@@ -40,16 +48,8 @@ export const metadata: Metadata = {
     title: "AI Cookbook - Share & Discover AI Prompts",
     description:
       "Browse, share, and discover curated AI prompts for ChatGPT, Gemini, MidJourney, and other AI tools. Unlock new ways to boost creativity and productivity.",
-    url: siteUrl,
     siteName: "AI Cookbook",
-    images: [
-      {
-        url: "/api/og?type=default",
-        width: 1200,
-        height: 630,
-        alt: "AI Cookbook - Share & Discover AI Prompts",
-      },
-    ],
+    images: ["/opengraph-image.png"],
     locale: "en_US",
     type: "website",
   },
@@ -58,24 +58,7 @@ export const metadata: Metadata = {
     title: "AI Cookbook - Share & Discover the Best AI Prompts",
     description:
       "AI Cookbook is a community-driven library of AI prompts for ChatGPT, Gemini, MidJourney, and more. Share your own prompts and discover new ideas.",
-    images: ["/api/og?type=default"],
-    creator: "@aicookbook",
-  },
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      "max-video-preview": -1,
-      "max-image-preview": "large",
-      "max-snippet": -1,
-    },
-  },
-  verification: {
-    // Add your verification tokens here when ready
-    // google: 'your-google-verification-code',
-    // yandex: 'your-yandex-verification-code',
+    images: ["/opengraph-image.png"],
   },
 };
 

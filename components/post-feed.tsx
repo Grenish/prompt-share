@@ -34,6 +34,7 @@ import {
   getPostEngagement,
   type PostCommentPayload,
 } from "@/util/actions/postsActions";
+import { isNotAuthenticatedError, navigateToLogin } from "@/util/auth/client-auth";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -1658,6 +1659,11 @@ export function PostFeed({
     async (post: Post, nextLiked: boolean) => {
       const res = await togglePostLike(post.id, nextLiked);
       if (!res.ok) {
+        // Check if user needs to authenticate
+        if (isNotAuthenticatedError(res.error)) {
+          navigateToLogin();
+          throw new Error("Login required");
+        }
         toast.error(res.error ?? "Couldn't update like");
         throw new Error(res.error ?? "Failed to update like");
       }
@@ -1719,6 +1725,11 @@ export function PostFeed({
     async (post: Post, nextSaved: boolean) => {
       const res = await togglePostSave(post.id, nextSaved);
       if (!res.ok) {
+        // Check if user needs to authenticate
+        if (isNotAuthenticatedError(res.error)) {
+          navigateToLogin();
+          throw new Error("Login required");
+        }
         toast.error(res.error ?? "Couldn't update save");
         throw new Error(res.error ?? "Failed to update save");
       }
@@ -1754,6 +1765,11 @@ export function PostFeed({
     async (post: Post, text: string) => {
       const res = await createPostComment(post.id, text);
       if (!res.ok || !res.comment) {
+        // Check if user needs to authenticate
+        if (isNotAuthenticatedError(res.error)) {
+          navigateToLogin();
+          throw new Error("Login required");
+        }
         toast.error(res.error ?? "Couldn't post comment");
         throw new Error(res.error ?? "Failed to post comment");
       }

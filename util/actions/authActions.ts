@@ -174,12 +174,10 @@ export async function signup(formData: FormData) {
     redirectWithToast("/signup", "error", { m: res.error ?? undefined });
   }
 
-  // Revalidate and redirect to "/" with a toast flag.
+  // Redirect to confirmation page instead of directly to home
+  // User needs to confirm their email first
   revalidatePath("/", "layout");
-
-  // message will be either "verify_email" or "signup_success"
-  const toastKey = res.message || "signup_success";
-  redirectWithToast("/", toastKey);
+  redirect("/auth/confirm-email");
 }
 
 export async function logout() {

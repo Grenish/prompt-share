@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "../supabase/server";
 import { enqueueNotification } from "./notificationsActions";
 import { toStoragePath } from "@/util/storage/helpers";
+import { NOT_AUTHENTICATED_ERROR } from "@/util/auth/client-auth";
 
 type ActionBaseResult = {
   ok: boolean;
@@ -393,7 +394,8 @@ export async function togglePostLike(
   } = await supabase.auth.getUser();
 
   if (userError || !user) {
-    return { ok: false, error: "Not authenticated" };
+    // Return specific error code that client can detect and redirect to login
+    return { ok: false, error: NOT_AUTHENTICATED_ERROR };
   }
 
   if (!postId) {
@@ -471,7 +473,8 @@ export async function togglePostSave(
   } = await supabase.auth.getUser();
 
   if (userError || !user) {
-    return { ok: false, error: "Not authenticated" };
+    // Return specific error code that client can detect and redirect to login
+    return { ok: false, error: NOT_AUTHENTICATED_ERROR };
   }
 
   if (!postId) {
@@ -518,7 +521,8 @@ export async function createPostComment(
   } = await supabase.auth.getUser();
 
   if (userError || !user) {
-    return { ok: false, error: "Not authenticated" };
+    // Return specific error code that client can detect and redirect to login
+    return { ok: false, error: NOT_AUTHENTICATED_ERROR };
   }
 
   const { data: inserted, error } = await supabase

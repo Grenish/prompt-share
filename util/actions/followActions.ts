@@ -3,6 +3,7 @@
 import { createClient } from "../supabase/server";
 import { revalidatePath } from "next/cache";
 import { enqueueNotification } from "./notificationsActions";
+import { NOT_AUTHENTICATED_ERROR } from "@/util/auth/client-auth";
 
 export type FollowActionState = {
   ok: boolean;
@@ -49,7 +50,8 @@ export async function toggleFollow(
     error: userErr,
   } = await supabase.auth.getUser();
   if (userErr || !user) {
-    return { ok: false, following: false, error: "Not authenticated" };
+    // Return specific error code that client can detect and redirect to login
+    return { ok: false, following: false, error: NOT_AUTHENTICATED_ERROR };
   }
   if (!targetUserId || targetUserId === user.id) {
     // ignore self follow

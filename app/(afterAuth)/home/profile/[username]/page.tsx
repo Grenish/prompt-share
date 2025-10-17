@@ -11,7 +11,6 @@ import { AboutMeSection } from "@/components/profile/about-me";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { notFound } from "next/navigation";
 import { FollowButton } from "@/components/profile/follow-button";
-import type { Metadata } from "next";
 
 type ProfileRow = {
   id: string;
@@ -22,68 +21,13 @@ type ProfileRow = {
   background_image: string | null;
 };
 
-type ProfilePageProps = {
-  params: Promise<{ username: string }> | { username: string };
-};
-
-export async function generateMetadata({ params }: ProfilePageProps): Promise<Metadata> {
-  const supabase = await createClient();
-  const { username } = await (params as Promise<{ username: string }>);
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("username, full_name, bio, avatar_url")
-    .eq("username", username)
-    .maybeSingle();
-
-  if (!profile) {
-    return {
-      title: "Profile Not Found",
-      description: "This profile could not be found.",
-    };
-  }
-
-  const displayName = profile.full_name || profile.username;
-  const title = `${displayName} (@${profile.username})`;
-  const description = profile.bio 
-    ? `${profile.bio.slice(0, 160)}${profile.bio.length > 160 ? "..." : ""}`
-    : `View ${displayName}'s AI prompts and profile on AI Cookbook`;
-
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://aicookbook.vercel.app";
-  const avatarParam = profile.avatar_url ? `&avatar=${encodeURIComponent(profile.avatar_url)}` : "";
-  const ogImageUrl = `/api/og?type=profile&title=${encodeURIComponent(displayName)}&description=${encodeURIComponent(profile.bio || "AI Cookbook User")}&username=${encodeURIComponent(profile.username)}${avatarParam}`;
-
-  return {
-    title,
-    description,
-    openGraph: {
-      title,
-      description,
-      type: "profile",
-      url: `${siteUrl}/home/profile/${username}`,
-      images: [
-        {
-          url: ogImageUrl,
-          width: 1200,
-          height: 630,
-          alt: `${displayName}'s profile`,
-        },
-      ],
-    },
-    twitter: {
-      card: "summary_large_image",
-      title,
-      description,
-      images: [ogImageUrl],
-    },
-  };
-}
-
 export default async function DashboardProfilePage({
   params,
-}: ProfilePageProps) {
+}: {
+  params: Promise<{ username: string }>;
+}) {
   const supabase = await createClient();
-  const { username } = await (params as Promise<{ username: string }>);
+  const { username } = await params;
 
   const [{ data: viewerData }, { data: profile, error: profileErr }] =
     await Promise.all([
@@ -130,7 +74,7 @@ export default async function DashboardProfilePage({
       supabase
         .from("posts")
         .select(
-          "id, created_at, text, media_urls, model_name, category, sub_category, author"
+          "id, created_at, text, media_urls, model_name, category, sub_category, author",
         )
         .eq("author", targetId)
         .order("created_at", { ascending: false }),
@@ -156,7 +100,7 @@ export default async function DashboardProfilePage({
 
   const combinedRows = authorPostRows;
   const engagementIds = Array.from(
-    new Set(combinedRows.map((row) => String(row.id)))
+    new Set(combinedRows.map((row) => String(row.id))),
   );
 
   const likeCountMap = new Map<string, number>();
@@ -196,7 +140,7 @@ export default async function DashboardProfilePage({
         .eq("user_id", viewerId)
         .in("post_id", engagementIds);
       viewerSavedSet = new Set(
-        (viewerSavedRows || []).map((row) => String(row.post_id))
+        (viewerSavedRows || []).map((row) => String(row.post_id)),
       );
     }
   }

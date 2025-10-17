@@ -1,8 +1,16 @@
-import { type NextRequest } from 'next/server'
-import { updateSession } from './util/supabase/middleware'
+import { type NextRequest } from "next/server";
+import { updateSession } from "./util/supabase/middleware";
 
 export async function middleware(request: NextRequest) {
-  return await updateSession(request)
+  // Skip middleware for opengraph-image and icon routes
+  if (
+    request.nextUrl.pathname.includes("/opengraph-image") ||
+    request.nextUrl.pathname.includes("/icon")
+  ) {
+    return;
+  }
+
+  return await updateSession(request);
 }
 
 export const config = {
@@ -12,10 +20,9 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * Feel free to modify this pattern to include more paths.
+     * - Static image files (svg, png, jpg, jpeg, gif, webp)
      */
-  // Intercept root and all routes except explicit public/static ones
-  '/',
-  '/((?!login|signup|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    "/",
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
-}
+};
