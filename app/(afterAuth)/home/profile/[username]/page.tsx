@@ -24,10 +24,10 @@ type ProfileRow = {
 export default async function DashboardProfilePage({
   params,
 }: {
-  params: Promise<{ username: string }> | { username: string };
+  params: Promise<{ username: string }>;
 }) {
   const supabase = await createClient();
-  const { username } = await (params as Promise<{ username: string }>);
+  const { username } = await params;
 
   const [{ data: viewerData }, { data: profile, error: profileErr }] =
     await Promise.all([
@@ -74,7 +74,7 @@ export default async function DashboardProfilePage({
       supabase
         .from("posts")
         .select(
-          "id, created_at, text, media_urls, model_name, category, sub_category, author"
+          "id, created_at, text, media_urls, model_name, category, sub_category, author",
         )
         .eq("author", targetId)
         .order("created_at", { ascending: false }),
@@ -100,7 +100,7 @@ export default async function DashboardProfilePage({
 
   const combinedRows = authorPostRows;
   const engagementIds = Array.from(
-    new Set(combinedRows.map((row) => String(row.id)))
+    new Set(combinedRows.map((row) => String(row.id))),
   );
 
   const likeCountMap = new Map<string, number>();
@@ -140,7 +140,7 @@ export default async function DashboardProfilePage({
         .eq("user_id", viewerId)
         .in("post_id", engagementIds);
       viewerSavedSet = new Set(
-        (viewerSavedRows || []).map((row) => String(row.post_id))
+        (viewerSavedRows || []).map((row) => String(row.post_id)),
       );
     }
   }

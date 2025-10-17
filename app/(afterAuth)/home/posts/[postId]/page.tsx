@@ -5,10 +5,46 @@ import type {
   MobilePost,
   MobilePostComment,
 } from "@/components/post/mobile-post-view";
+import type { Metadata } from "next";
 
 type PageProps = {
   params: Promise<{ postId: string }>;
 };
+
+export async function generateMetadata({
+  params,
+}: PageProps): Promise<Metadata> {
+  const { postId } = await params;
+  const supabase = await createClient();
+
+  const { data: postRow } = await supabase
+    .from("posts")
+    .select("text, category")
+    .eq("id", postId)
+    .single();
+
+  const title = postRow?.text
+    ? `${postRow.text.slice(0, 60)}${postRow.text.length > 60 ? "..." : ""} - AI Cookbook`
+    : "AI Prompt - AI Cookbook";
+
+  const description =
+    postRow?.text?.slice(0, 160) || "View this AI prompt on AI Cookbook";
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "article",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+    },
+  };
+}
 
 const normalizeString = (value: unknown): string | undefined => {
   if (typeof value !== "string") return undefined;
@@ -53,7 +89,7 @@ export default async function PostPage({ params }: PageProps) {
   const { data: postRow, error: postErr } = await supabase
     .from("posts")
     .select(
-      "id, created_at, text, media_urls, model_name, model_label, model_key, model_kind, model_provider, model_provider_slug, category, category_slug, sub_category, sub_category_slug, author"
+      "id, created_at, text, media_urls, model_name, model_label, model_key, model_kind, model_provider, model_provider_slug, category, category_slug, sub_category, sub_category_slug, author",
     )
     .eq("id", postId)
     .single<PostRow>();
@@ -84,7 +120,7 @@ export default async function PostPage({ params }: PageProps) {
 
   const media: string[] = Array.isArray(postRow.media_urls)
     ? postRow.media_urls.filter(
-        (u): u is string => typeof u === "string" && u.trim().length > 0
+        (u): u is string => typeof u === "string" && u.trim().length > 0,
       )
     : [];
 
@@ -125,8 +161,8 @@ export default async function PostPage({ params }: PageProps) {
     new Set(
       (commentRows || [])
         .map((row) => row.user_id)
-        .filter((id): id is string => Boolean(id))
-    )
+        .filter((id): id is string => Boolean(id)),
+    ),
   );
 
   const commentProfiles = new Map<string, ProfileRow>();
