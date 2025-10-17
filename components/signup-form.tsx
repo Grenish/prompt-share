@@ -1,19 +1,58 @@
-import { Book } from "lucide-react";
+"use client";
 
-import { cn } from "@/lib/utils";
+import { Book } from "lucide-react";
+import Link from "next/link";
+import { useActionState, useEffect, useRef, useState } from "react";
+
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import Link from "next/link";
-import { signup } from "@/util/actions/authActions";
+import { cn } from "@/lib/utils";
+import { signupAction, type SignupState } from "@/util/actions/authActions";
 
 export function SignupForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
+  const [state, formAction, pending] = useActionState<SignupState, FormData>(
+    signupAction,
+    { ok: false },
+  );
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    if (state?.ok) {
+      setDialogOpen(true);
+      formRef.current?.reset();
+    }
+  }, [state?.ok]);
+
+  const dialogCopy =
+    state?.message === "verify_email"
+      ? {
+          title: "Check your inbox",
+          description:
+            "We've sent a verification link to your email. Please confirm to finish creating your account.",
+        }
+      : {
+          title: "Account created",
+          description:
+            "Your account is ready to go. You can sign in whenever you're ready.",
+        };
+
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <form>
+      <form action={formAction} ref={formRef}>
         <div className="flex flex-col gap-6">
           <div className="flex flex-col items-center gap-2">
             <a
@@ -65,9 +104,14 @@ export function SignupForm({
                 required
               />
             </div>
-            <Button type="submit" className="w-full" formAction={signup}>
-              Sign Up
+            <Button type="submit" className="w-full" disabled={pending}>
+              {pending ? "Signing up…" : "Sign Up"}
             </Button>
+            {state?.error ? (
+              <p className="text-sm text-destructive" role="alert">
+                {state.error}
+              </p>
+            ) : null}
           </div>
           <div className="after:border-border relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t">
             <span className="bg-background text-muted-foreground relative z-10 px-2">
@@ -75,7 +119,7 @@ export function SignupForm({
             </span>
           </div>
           <div className="space-y-4">
-            <Button variant="outline" type="button" className="w-full">
+            <Button variant="outline" type="button" className="w-full" disabled>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="32"
@@ -87,7 +131,7 @@ export function SignupForm({
               </svg>
               Continue with Github
             </Button>
-            <Button variant="outline" type="button" className="w-full">
+            <Button variant="outline" type="button" className="w-full" disabled>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="32"
@@ -106,6 +150,21 @@ export function SignupForm({
         By signing up, you agree to our <a href="#">Terms of Service</a> and{" "}
         <a href="#">Privacy Policy</a>.
       </div>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{dialogCopy.title}</DialogTitle>
+            <DialogDescription>{dialogCopy.description}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" className="w-full sm:w-auto">
+                Got it
+              </Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,9 +1,10 @@
 import Navbar from "@/components/navbar";
+import type { ReactNode } from "react";
 
 export default function HomeLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode;
+  children: ReactNode;
 }>) {
   return (
     <main>

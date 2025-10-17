@@ -1,6 +1,7 @@
 import {
   Award,
   Bell,
+  Book,
   Home,
   PlusCircle,
   Search,
@@ -31,7 +32,7 @@ const navItems = [
   { title: "Profile", href: `${basePath}/profile`, icon: UserIcon },
   { title: "Explore", href: `${basePath}/explore`, icon: Search },
   { title: "Notifications", href: `${basePath}/notifications`, icon: Bell },
-  // { title: "Leaderboard", href: `${basePath}/leaderboard`, icon: Award },
+  { title: "Cookbooks", href: `${basePath}/cookbooks`, icon: Book },
   { title: "Create", href: `${basePath}/create`, icon: PlusCircle },
 ];
 

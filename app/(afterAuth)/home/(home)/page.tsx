@@ -246,7 +246,7 @@ export default async function DashboardHomePage() {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-30 border-b bg-background/80 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="text-lg font-semibold">Cookbook</div>
+          <div className="text-lg font-semibold">AI Cookbook</div>
           <div className="text-sm text-muted-foreground truncate max-w-[180px]">
             <UserButton
               userId={user?.id}
