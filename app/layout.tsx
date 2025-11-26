@@ -18,7 +18,9 @@ const getBaseUrl = () => {
 };
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
+  ),
   title: "AI Cookbook",
   description:
     "AI Cookbook is your go-to library for powerful AI prompts. Share your own, explore curated prompts, and unlock creativity with ChatGPT, Gemini, MidJourney, and more.",
@@ -98,6 +100,18 @@ export default function RootLayout({
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                const palette = localStorage.getItem('color-palette');
+                if (palette && palette !== 'default') {
+                  document.documentElement.setAttribute('data-theme', palette);
+                }
+              } catch (e) {}
+            `,
+          }}
         />
       </head>
       <body className="font-sans antialiased">
