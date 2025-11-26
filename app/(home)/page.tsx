@@ -1,5 +1,9 @@
 import BrowsePage from "@/components/browse-page";
+import CTA from "@/components/cta";
+import Features from "@/components/features";
+import Footer from "@/components/footer";
 import Hero from "@/components/hero";
+import OpenSource from "@/components/open-source";
 
 export default function Home() {
   return (
@@ -29,9 +33,13 @@ export default function Home() {
           backgroundBlendMode: "normal, screen, screen, screen, screen",
         }}
       />
-      <div className="relative min-h-screen">
+      <div className="relative">
         <Hero />
         <BrowsePage />
+        <Features />
+        <CTA />
+        <OpenSource />
+        <Footer />
       </div>
     </div>
   );
