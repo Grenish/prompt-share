@@ -302,10 +302,30 @@ export function SettingsAppearanceCard() {
 
   React.useEffect(() => setMounted(true), []);
 
+  const applyColorPalette = React.useCallback((paletteId: ColorPalette) => {
+    if (typeof window === "undefined") return;
+
+    const root = document.documentElement;
+    root.removeAttribute("data-theme");
+    if (paletteId !== "default") {
+      const cfg = getPaletteConfig(paletteId);
+      root.setAttribute("data-theme", cfg?.dataThemeAttribute ?? paletteId);
+    }
+    localStorage.setItem("color-palette", paletteId);
+  }, []);
+
   React.useEffect(() => {
     if (!mounted) return;
-    const savedThemeChoice = localStorage.getItem("theme-choice") as ThemeChoice | null;
-    if (savedThemeChoice && (savedThemeChoice === "system" || savedThemeChoice === "light" || savedThemeChoice === "dark" || savedThemeChoice === "time")) {
+    const savedThemeChoice = localStorage.getItem(
+      "theme-choice",
+    ) as ThemeChoice | null;
+    if (
+      savedThemeChoice &&
+      (savedThemeChoice === "system" ||
+        savedThemeChoice === "light" ||
+        savedThemeChoice === "dark" ||
+        savedThemeChoice === "time")
+    ) {
       setThemeChoice(savedThemeChoice);
     } else if (theme === "system" || theme === "light" || theme === "dark") {
       setThemeChoice(theme);
@@ -313,12 +333,22 @@ export function SettingsAppearanceCard() {
   }, [mounted, theme]);
 
   React.useEffect(() => {
+    if (!mounted) return;
+
+    // Check if data-theme attribute is already set (from blocking script)
+    const currentTheme = document.documentElement.getAttribute("data-theme");
+    if (currentTheme && getPaletteConfig(currentTheme)) {
+      setColorPalette(currentTheme as ColorPalette);
+      return;
+    }
+
+    // Otherwise check localStorage
     const saved = localStorage.getItem("color-palette");
     if (saved && getPaletteConfig(saved)) {
       setColorPalette(saved as ColorPalette);
       applyColorPalette(saved as ColorPalette);
     }
-  }, []);
+  }, [mounted, applyColorPalette]);
 
   // Time-based theme switching
   React.useEffect(() => {
@@ -339,16 +369,6 @@ export function SettingsAppearanceCard() {
 
     return () => clearInterval(interval);
   }, [themeChoice, setTheme]);
-
-  const applyColorPalette = React.useCallback((paletteId: ColorPalette) => {
-    const root = document.documentElement;
-    root.removeAttribute("data-theme");
-    if (paletteId !== "default") {
-      const cfg = getPaletteConfig(paletteId);
-      root.setAttribute("data-theme", cfg?.dataThemeAttribute ?? paletteId);
-    }
-    localStorage.setItem("color-palette", paletteId);
-  }, []);
 
   return (
     <section className="space-y-6">
@@ -405,7 +425,7 @@ export function SettingsAppearanceCard() {
                 "relative flex flex-col items-center gap-2 rounded-lg border-2 p-3 transition-all",
                 themeChoice === value
                   ? "border-primary bg-primary/5"
-                  : "border-border hover:border-primary/40"
+                  : "border-border hover:border-primary/40",
               )}
             >
               <Icon className="h-5 w-5" />
@@ -439,7 +459,7 @@ export function SettingsAppearanceCard() {
                 "relative rounded-lg border-2 p-3 text-left transition-all",
                 colorPalette === palette.id
                   ? "border-primary bg-primary/5"
-                  : "border-border hover:border-primary/40"
+                  : "border-border hover:border-primary/40",
               )}
             >
               <div className="flex items-center gap-2 mb-2">
